@@ -144,8 +144,6 @@
       <input type="text" id="fName" placeholder="sauravhhh" autocomplete="off">
       <label for="fSecret">Secret key</label>
       <input type="text" id="fSecret" class="mono" placeholder="JBSW Y3DP EHPK 3PXP" autocomplete="off" autocapitalize="characters" spellcheck="false">
-      <label for="fOtp">Or paste an otpauth:// link</label>
-      <input type="text" id="fOtp" placeholder="otpauth://totp/..." autocomplete="off" autocapitalize="off" spellcheck="false">
       <div class="err" id="formErr"></div>
       <button class="btn" id="saveBtn">Add account</button>
     </div>
@@ -333,24 +331,15 @@
 
   document.getElementById("saveBtn").addEventListener("click", function () {
     var errEl = document.getElementById("formErr");
-    var otpVal = document.getElementById("fOtp").value.trim();
-    var err = null;
-    if (otpVal) {
-      var parsed = parseOtpAuth(otpVal);
-      if (!parsed) err = "That otpauth:// link doesn't look right.";
-      else err = addAccount(parsed);
-    } else {
-      err = addAccount({
-        issuer: document.getElementById("fIssuer").value.trim(),
-        name: document.getElementById("fName").value.trim(),
-        secret: document.getElementById("fSecret").value.trim()
-      });
-    }
+    var err = addAccount({
+      issuer: document.getElementById("fIssuer").value.trim(),
+      name: document.getElementById("fName").value.trim(),
+      secret: document.getElementById("fSecret").value.trim()
+    });
     if (err) { errEl.textContent = err; errEl.style.display = "block"; return; }
     document.getElementById("fIssuer").value = "";
     document.getElementById("fName").value = "";
     document.getElementById("fSecret").value = "";
-    document.getElementById("fOtp").value = "";
     closeSheet();
   });
 
