@@ -151,6 +151,8 @@
       <video id="video" playsinline muted></video>
       <canvas id="canvas" hidden></canvas>
       <p class="scan-msg" id="scanMsg">Point your camera at the QR code.</p>
+      <button class="btn ghost" id="uploadBtn" type="button">Upload from gallery</button>
+      <input type="file" id="galleryFile" accept="image/*" hidden>
       <div class="err" id="scanErr"></div>
     </div>
     <button class="btn ghost" id="cancelBtn">Cancel</button>
@@ -290,6 +292,14 @@
     };
   }
 
+  function normAlgo(a) {
+    var s = String(a || "SHA-1").toUpperCase().replace(/-/g, "");
+    if (s === "SHA1") return "SHA-1";
+    if (s === "SHA256") return "SHA-256";
+    if (s === "SHA512") return "SHA-512";
+    return "SHA-1";
+  }
+
   function addAccount(acct) {
     if (!acct.secret) return "Missing secret key.";
     try { base32Decode(acct.secret); } catch (e) { return "That secret key doesn't look right — check it and try again."; }
@@ -298,7 +308,7 @@
     accounts.push({
       id: uid(), issuer: acct.issuer || "Account", name: acct.name || "",
       secret: acct.secret.replace(/[\s\-]/g, "").toUpperCase(),
-      digits: acct.digits || 6, period: acct.period || 30, algo: acct.algo || "SHA-1"
+      digits: acct.digits || 6, period: acct.period || 30, algo: normAlgo(acct.algo)
     });
     save(accounts);
     refreshCodes();
@@ -393,6 +403,54 @@
     }
     requestAnimationFrame(scanLoop);
   }
+
+  /* ---------- gallery upload ---------- */
+  document.getElementById("uploadBtn").addEventListener("click", function () {
+    document.getElementById("galleryFile").click();
+  });
+  document.getElementById("galleryFile").addEventListener("change", function (e) {
+    var file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    var msgEl = document.getElementById("scanMsg");
+    var errEl = document.getElementById("scanErr");
+    errEl.style.display = "none";
+    if (typeof jsQR === "undefined") {
+      errEl.textContent = "QR library didn't load (needs internet once) — enter the key by hand instead.";
+      errEl.style.display = "block"; return;
+    }
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var maxSide = 1200;
+        var scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+        var canvas = document.getElementById("canvas");
+        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        var data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        var res = jsQR(data.data, data.width, data.height, { inversionAttempts: "attemptBoth" });
+        if (!res || !res.data) {
+          msgEl.textContent = "No QR code found in that image — try a clearer photo.";
+          return;
+        }
+        var parsed = parseOtpAuth(res.data);
+        if (!parsed) {
+          msgEl.textContent = "That QR code isn't a 2FA setup code — try another.";
+          return;
+        }
+        var err = addAccount(parsed);
+        if (err) msgEl.textContent = err;
+        else closeSheet();
+      };
+      img.onerror = function () { msgEl.textContent = "Couldn't read that image — try another file."; };
+      img.src = reader.result;
+    };
+    reader.onerror = function () { msgEl.textContent = "Couldn't read that image — try another file."; };
+    reader.readAsDataURL(file);
+  });
 
   /* ---------- list actions ---------- */
   listEl.addEventListener("click", function (e) {
