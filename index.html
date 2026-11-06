@@ -82,6 +82,8 @@
   .sheet p.body { color: #333; font-size: 14px; line-height: 1.6; margin-bottom: 10px; }
   .warn { background: #fef3f2; border: 1px solid #f5c6c2; color: #7a1f1a; font-size: 13px; line-height: 1.5; padding: 10px 12px; border-radius: 10px; margin-bottom: 14px; }
   .or { text-align: center; color: #999; font-size: 13px; margin: 14px 0 2px; }
+  .sheet a { color: #d32d27; }
+  .link-btn { background: none; border: none; color: #d32d27; font-size: 13px; cursor: pointer; margin-top: 14px; text-decoration: underline; padding: 4px; }
   #lockScreen { position: fixed; inset: 0; background: #fff; z-index: 60; display: none; align-items: center; justify-content: center; padding: 24px; }
   #lockScreen.open { display: flex; }
   .lock-box { width: 100%; max-width: 320px; text-align: center; }
@@ -89,8 +91,8 @@
   .lock-box h2 { font-size: 20px; margin-bottom: 6px; }
   .lock-hint { color: #666; font-size: 14px; margin-bottom: 18px; }
   .lock-box label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 5px; text-align: left; }
-  .lock-box input[type=password] { width: 100%; padding: 11px 12px; font-size: 15px; border: 1px solid #e5e5e5; border-radius: 10px; outline: none; text-align: center; }
-  .lock-box input[type=password]:focus { border-color: #d32d27; }
+  .lock-box input[type=password], .lock-box input[type=text] { width: 100%; padding: 11px 12px; font-size: 15px; border: 1px solid #e5e5e5; border-radius: 10px; outline: none; text-align: center; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .lock-box input[type=password]:focus, .lock-box input[type=text]:focus { border-color: #d32d27; }
   .lock-note { color: #999; font-size: 12px; line-height: 1.6; margin-top: 20px; }
   #lockScreen .btn { margin-top: 12px; }
   .sheet input.mono { font-family: ui-monospace, Menlo, Consolas, monospace; text-transform: uppercase; }
@@ -182,6 +184,7 @@
     <p class="body">Authr is a private two-factor authenticator. It generates 6-digit codes on this device for your accounts.</p>
     <p class="body">Your secrets never leave this browser. Codes are generated on-device and nothing is sent to any server.</p>
     <p class="body">If you clear this site's data, your accounts are gone. Export a backup from the menu first.</p>
+    <p class="body">Developed by <a href="https://saurabh.qzz.io" target="_blank" rel="noopener">sauravhhh</a></p>
     <button class="btn" id="aboutCloseBtn">Close</button>
   </div>
 </div>
@@ -190,7 +193,8 @@
   <div class="sheet">
     <h2>App lock</h2>
     <p class="hint" id="lockStatus">App lock is off. Turn it on to hide your codes behind fingerprint or a passcode.</p>
-    <p class="warn">If you forget your passcode and fingerprint is unavailable, the only way back in is clearing this site's data — which deletes all your accounts. Export a backup first.</p>
+    <p class="warn">If you forget your passcode, your fingerprint gets you back in. If no fingerprint is enrolled, the only way back in is clearing this site's data — which deletes all your accounts. Export a backup first.</p>
+    <p class="warn" id="recoveryBanner" style="display:none">You unlocked with your device. Set a new passcode below, or turn off App lock.</p>
     <button class="btn" id="fpSetupBtn">Use fingerprint</button>
     <p class="or">or set a passcode</p>
     <label for="fPass">Passcode (4+ digits)</label>
@@ -215,8 +219,9 @@
       <input type="password" id="fUnlockPass" inputmode="numeric" autocomplete="off" placeholder="Enter passcode">
       <div class="err" id="unlockErr"></div>
       <button class="btn" id="passUnlockBtn">Unlock</button>
+      <button class="link-btn" id="deviceUnlockLink" style="display:none">Use device unlock instead</button>
     </div>
-    <p class="lock-note">Forgot your passcode and fingerprint isn't available? Clearing this site's data is the only way back in — and it deletes all accounts.</p>
+    <p class="lock-note">Forgot your passcode? Your fingerprint gets you back in — or, in the app, your device unlock (fingerprint, PIN or pattern). If no fingerprint is enrolled, clearing this site's data is the only way back in, and it deletes all accounts.</p>
   </div>
 </div>
 
@@ -610,10 +615,7 @@
   document.addEventListener("click", function (e) { if (!menu.contains(e.target)) menu.classList.remove("open"); });
   document.getElementById("exportBtn").addEventListener("click", function () {
     menu.classList.remove("open");
-    var blob = new Blob([JSON.stringify({ app: "authr", version: 1, accounts: accounts }, null, 2)], { type: "application/json" });
-    var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "authr-backup.json"; a.click();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    downloadTextFile("authr-backup.json", JSON.stringify({ app: "authr", version: 1, accounts: accounts }, null, 2), "application/json");
   });
   document.getElementById("importBtn").addEventListener("click", function () {
     menu.classList.remove("open");
@@ -670,6 +672,23 @@
       return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
     });
   }
+  /* Download a text file. In the Android app the native bridge saves it to
+     the Downloads folder; on the web it uses a Blob download. */
+  function downloadTextFile(name, text, mime) {
+    if (window.AuthrNative && typeof window.AuthrNative.saveFile === "function") {
+      try {
+        var bytes = new TextEncoder().encode(text), bin = "";
+        for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        var ok = window.AuthrNative.saveFile(name, btoa(bin));
+        if (ok === false) alert("Couldn't save the file — storage access is needed. Allow it in the app settings.");
+        return;
+      } catch (e) {}
+    }
+    var blob = new Blob([text], { type: mime || "text/plain" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
   function refreshLockUI() {
     var on = !!(lockCfg && lockCfg.on);
     document.getElementById("lockBtn").textContent = on ? "App lock: On" : "App lock: Off";
@@ -689,6 +708,20 @@
     locked = false;
     document.getElementById("lockScreen").classList.remove("open");
     refreshCodes();
+  }
+  /* Verify a fingerprint without unlocking: WebAuthn on the web, the native
+     AuthrNative bridge in the Android app. Returns Promise<boolean>. */
+  function verifyFingerprint(title) {
+    if (typeof nativeAuthenticate === "function" && lockCfg && lockCfg.nativeFp) return nativeAuthenticate(title);
+    if (!lockCfg || !lockCfg.credId) return Promise.resolve(false);
+    return navigator.credentials.get({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        allowCredentials: [{ id: b64urlToBuf(lockCfg.credId), type: "public-key" }],
+        userVerification: "required",
+        timeout: 60000
+      }
+    }).then(function () { return true; }).catch(function () { return false; });
   }
   function tryFingerprintUnlock(auto) {
     if (!lockCfg || !lockCfg.credId) return Promise.resolve(false);
@@ -713,6 +746,8 @@
     document.getElementById("fUnlockPass").value = "";
     document.getElementById("fpUnlockBtn").style.display = hasFp ? "block" : "none";
     document.getElementById("passUnlock").style.display = hasPass ? "block" : "none";
+    var hasDeviceUnlock = !!(window.AuthrNative && typeof window.AuthrNative.requestDeviceUnlock === "function");
+    document.getElementById("deviceUnlockLink").style.display = (hasPass && hasDeviceUnlock) ? "block" : "none";
     document.getElementById("lockScreen").classList.add("open");
     if (hasFp) tryFingerprintUnlock(true);
   }
@@ -774,14 +809,34 @@
       document.getElementById("fPass").value = "";
       document.getElementById("fPass2").value = "";
       refreshLockUI();
+      if (recoveryMode) endRecovery();
       alert("Passcode set — Authr will ask for it when it opens.");
     });
   });
-  document.getElementById("lockOffBtn").addEventListener("click", function () {
-    if (!confirm("Turn off App lock? Your codes will open without unlocking.")) return;
+  var recoveryMode = false;
+  function endRecovery() {
+    recoveryMode = false;
+    document.getElementById("recoveryBanner").style.display = "none";
+    document.getElementById("lockCancelBtn").style.display = "block";
+  }
+  function turnLockOff() {
     clearLock(); lockCfg = null;
+    endRecovery();
     document.getElementById("lockOverlay").classList.remove("open");
     refreshLockUI();
+  }
+  document.getElementById("lockOffBtn").addEventListener("click", function () {
+    var errEl = document.getElementById("lockErr");
+    errEl.style.display = "none";
+    if (lockCfg && (lockCfg.credId || lockCfg.nativeFp)) {
+      verifyFingerprint("Turn off App lock").then(function (ok) {
+        if (!ok) { errEl.textContent = "Fingerprint didn't work — the lock stays on."; errEl.style.display = "block"; return; }
+        turnLockOff();
+      });
+      return;
+    }
+    if (!confirm("Turn off App lock? Your codes will open without unlocking.")) return;
+    turnLockOff();
   });
   document.getElementById("fpUnlockBtn").addEventListener("click", function () { tryFingerprintUnlock(false); });
   document.getElementById("passUnlockBtn").addEventListener("click", function () {
@@ -795,6 +850,33 @@
   document.getElementById("fUnlockPass").addEventListener("keydown", function (e) {
     if (e.key === "Enter") document.getElementById("passUnlockBtn").click();
   });
+  /* Device unlock (Android app only): the phone's own lock screen —
+     fingerprint, PIN or pattern — recovers a forgotten passcode, even
+     when the app itself has no fingerprint enrolled. */
+  document.getElementById("deviceUnlockLink").addEventListener("click", function () {
+    var errEl = document.getElementById("unlockErr");
+    errEl.style.display = "none";
+    if (window.AuthrNative && typeof window.AuthrNative.requestDeviceUnlock === "function") {
+      try { window.AuthrNative.requestDeviceUnlock(); } catch (e) {
+        errEl.textContent = "Device unlock isn't available — use your passcode.";
+        errEl.style.display = "block";
+      }
+    }
+  });
+  window.__onDeviceUnlockResult = function (ok) {
+    if (ok) {
+      recoveryMode = true;
+      unlock();
+      document.getElementById("recoveryBanner").style.display = "block";
+      document.getElementById("lockCancelBtn").style.display = "none";
+      refreshLockUI();
+      document.getElementById("lockOverlay").classList.add("open");
+    } else {
+      var errEl = document.getElementById("unlockErr");
+      errEl.textContent = "Device unlock didn't work — try again or use your passcode.";
+      errEl.style.display = "block";
+    }
+  };
 
   /* ---------- tick ---------- */
   refreshLockUI();
