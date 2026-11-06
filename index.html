@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Authr — 2FA Authenticator</title>
-<meta name="theme-color" content="#4f46e5">
+<meta name="theme-color" content="#d32d27">
 <meta name="description" content="Authr — a private 2FA authenticator. Add accounts, get 6-digit codes. Everything stays on your device.">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
@@ -33,7 +33,7 @@
     width: 100%; padding: 11px 14px; font-size: 15px; border: 1px solid #e5e5e5;
     border-radius: 10px; outline: none; margin-bottom: 14px; background: #fff; color: #111;
   }
-  #search:focus { border-color: #4f46e5; }
+  #search:focus { border-color: #d32d27; }
   #list { display: flex; flex-direction: column; gap: 10px; }
   .card {
     border: 1px solid #e5e5e5; border-radius: 14px; padding: 14px 16px;
@@ -47,11 +47,11 @@
   .card .issuer { font-size: 13px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .card .name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .card .code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 26px; font-weight: 600; letter-spacing: 2px; margin-top: 2px; }
-  .card .code .copied { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: #4f46e5; letter-spacing: 0; margin-left: 8px; }
+  .card .code .copied { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: #d32d27; letter-spacing: 0; margin-left: 8px; }
   .ring { width: 40px; height: 40px; flex: none; }
   .ring circle { fill: none; stroke-width: 3; }
   .ring .bg { stroke: #ececec; }
-  .ring .fg { stroke: #4f46e5; stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; }
+  .ring .fg { stroke: #d32d27; stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; }
   .ring text { font-size: 11px; font-weight: 600; fill: #111; }
   .del {
     position: absolute; top: 6px; right: 8px; border: none; background: none; color: #bbb;
@@ -62,10 +62,10 @@
   .empty b { color: #111; }
   .fab {
     position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; border-radius: 50%;
-    background: #4f46e5; color: #fff; border: none; font-size: 30px; line-height: 1; cursor: pointer;
+    background: #d32d27; color: #fff; border: none; font-size: 30px; line-height: 1; cursor: pointer;
     box-shadow: 0 4px 16px rgba(79,70,229,.35); display: flex; align-items: center; justify-content: center;
   }
-  .fab:active { background: #4338ca; }
+  .fab:active { background: #b71c1c; }
   footer { text-align: center; color: #999; font-size: 12px; line-height: 1.6; margin: auto 0 8px; padding-top: 32px; }
   /* sheet */
   .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; align-items: flex-end; justify-content: center; z-index: 10; }
@@ -78,13 +78,13 @@
     width: 100%; padding: 11px 12px; font-size: 15px; border: 1px solid #e5e5e5;
     border-radius: 10px; outline: none; background: #fff; color: #111;
   }
-  .sheet input[type=text]:focus { border-color: #4f46e5; }
+  .sheet input[type=text]:focus { border-color: #d32d27; }
   .sheet input.mono { font-family: ui-monospace, Menlo, Consolas, monospace; text-transform: uppercase; }
   .btn {
     width: 100%; padding: 13px; margin-top: 18px; border: none; border-radius: 12px;
-    background: #4f46e5; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
+    background: #d32d27; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
   }
-  .btn:active { background: #4338ca; }
+  .btn:active { background: #b71c1c; }
   .btn.ghost { background: #f3f3f3; color: #111; margin-top: 10px; }
   .btn.ghost:active { background: #e9e9e9; }
   .tabs { display: flex; gap: 8px; margin-bottom: 6px; }
@@ -92,7 +92,7 @@
     flex: 1; padding: 10px; border: 1px solid #e5e5e5; border-radius: 10px; background: #fff;
     font-size: 14px; font-weight: 600; cursor: pointer; color: #111;
   }
-  .tabs button.active { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+  .tabs button.active { background: #d32d27; border-color: #d32d27; color: #fff; }
   #scanBox { display: none; }
   #scanBox .scan-msg { font-size: 13px; color: #666; margin-top: 8px; text-align: center; }
   .err { color: #c00; font-size: 13px; margin-top: 10px; display: none; }
