@@ -74,11 +74,25 @@
   .sheet h2 { font-size: 18px; margin-bottom: 4px; }
   .sheet p.hint { color: #666; font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
   .sheet label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 5px; }
-  .sheet input[type=text] {
+  .sheet input[type=text], .sheet input[type=password] {
     width: 100%; padding: 11px 12px; font-size: 15px; border: 1px solid #e5e5e5;
     border-radius: 10px; outline: none; background: #fff; color: #111;
   }
-  .sheet input[type=text]:focus { border-color: #d32d27; }
+  .sheet input[type=text]:focus, .sheet input[type=password]:focus { border-color: #d32d27; }
+  .sheet p.body { color: #333; font-size: 14px; line-height: 1.6; margin-bottom: 10px; }
+  .warn { background: #fef3f2; border: 1px solid #f5c6c2; color: #7a1f1a; font-size: 13px; line-height: 1.5; padding: 10px 12px; border-radius: 10px; margin-bottom: 14px; }
+  .or { text-align: center; color: #999; font-size: 13px; margin: 14px 0 2px; }
+  #lockScreen { position: fixed; inset: 0; background: #fff; z-index: 60; display: none; align-items: center; justify-content: center; padding: 24px; }
+  #lockScreen.open { display: flex; }
+  .lock-box { width: 100%; max-width: 320px; text-align: center; }
+  .lock-logo { width: 56px; height: 56px; border-radius: 14px; margin-bottom: 12px; }
+  .lock-box h2 { font-size: 20px; margin-bottom: 6px; }
+  .lock-hint { color: #666; font-size: 14px; margin-bottom: 18px; }
+  .lock-box label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 5px; text-align: left; }
+  .lock-box input[type=password] { width: 100%; padding: 11px 12px; font-size: 15px; border: 1px solid #e5e5e5; border-radius: 10px; outline: none; text-align: center; }
+  .lock-box input[type=password]:focus { border-color: #d32d27; }
+  .lock-note { color: #999; font-size: 12px; line-height: 1.6; margin-top: 20px; }
+  #lockScreen .btn { margin-top: 12px; }
   .sheet input.mono { font-family: ui-monospace, Menlo, Consolas, monospace; text-transform: uppercase; }
   .btn {
     width: 100%; padding: 13px; margin-top: 18px; border: none; border-radius: 12px;
@@ -118,6 +132,8 @@
   <div class="menu" id="menu">
     <button id="exportBtn">Export backup (JSON)</button>
     <button id="importBtn">Import backup</button>
+    <button id="lockBtn">App lock: Off</button>
+    <button id="aboutBtn">About</button>
     <input type="file" id="importFile" accept=".json,application/json" hidden>
   </div>
   <p class="sub">Your 2FA codes. Everything stays on this device.</p>
@@ -143,7 +159,7 @@
       <label for="fIssuer">Service (e.g. GitHub)</label>
       <input type="text" id="fIssuer" placeholder="GitHub" autocomplete="off">
       <label for="fName">Account name (e.g. your username)</label>
-      <input type="text" id="fName" placeholder="sauravhhh" autocomplete="off">
+      <input type="text" id="fName" placeholder="Account name" autocomplete="off">
       <label for="fSecret">Secret key</label>
       <input type="text" id="fSecret" class="mono" placeholder="JBSW Y3DP EHPK 3PXP" autocomplete="off" autocapitalize="characters" spellcheck="false">
       <div class="err" id="formErr"></div>
@@ -157,6 +173,50 @@
       <div class="err" id="scanErr"></div>
     </div>
     <button class="btn ghost" id="cancelBtn">Cancel</button>
+  </div>
+</div>
+
+<div class="overlay" id="aboutOverlay">
+  <div class="sheet">
+    <h2>About Authr</h2>
+    <p class="body">Authr is a private two-factor authenticator. It generates 6-digit codes on this device for your accounts.</p>
+    <p class="body">Your secrets never leave this browser. Codes are generated on-device and nothing is sent to any server.</p>
+    <p class="body">If you clear this site's data, your accounts are gone. Export a backup from the menu first.</p>
+    <button class="btn" id="aboutCloseBtn">Close</button>
+  </div>
+</div>
+
+<div class="overlay" id="lockOverlay">
+  <div class="sheet">
+    <h2>App lock</h2>
+    <p class="hint" id="lockStatus">App lock is off. Turn it on to hide your codes behind fingerprint or a passcode.</p>
+    <p class="warn">If you forget your passcode and fingerprint is unavailable, the only way back in is clearing this site's data — which deletes all your accounts. Export a backup first.</p>
+    <button class="btn" id="fpSetupBtn">Use fingerprint</button>
+    <p class="or">or set a passcode</p>
+    <label for="fPass">Passcode (4+ digits)</label>
+    <input type="password" id="fPass" inputmode="numeric" autocomplete="off" placeholder="4+ digits">
+    <label for="fPass2">Confirm passcode</label>
+    <input type="password" id="fPass2" inputmode="numeric" autocomplete="off" placeholder="Repeat passcode">
+    <div class="err" id="lockErr"></div>
+    <button class="btn" id="passSetupBtn">Set passcode</button>
+    <button class="btn ghost" id="lockOffBtn" style="display:none">Turn off App lock</button>
+    <button class="btn ghost" id="lockCancelBtn">Close</button>
+  </div>
+</div>
+
+<div id="lockScreen">
+  <div class="lock-box">
+    <img src="icons/icon-192.png" alt="Authr logo" class="lock-logo">
+    <h2>Authr is locked</h2>
+    <p class="lock-hint">Unlock to see your 2FA codes.</p>
+    <button class="btn" id="fpUnlockBtn" style="display:none">Unlock with fingerprint</button>
+    <div id="passUnlock" style="display:none">
+      <label for="fUnlockPass">Passcode</label>
+      <input type="password" id="fUnlockPass" inputmode="numeric" autocomplete="off" placeholder="Enter passcode">
+      <div class="err" id="unlockErr"></div>
+      <button class="btn" id="passUnlockBtn">Unlock</button>
+    </div>
+    <p class="lock-note">Forgot your passcode and fingerprint isn't available? Clearing this site's data is the only way back in — and it deletes all accounts.</p>
   </div>
 </div>
 
@@ -214,6 +274,9 @@
 
   /* ---------- state ---------- */
   var accounts = load();
+  var LOCK_KEY = "authr.lock.v1";
+  var lockCfg = loadLock();
+  var locked = !!lockCfg;
   var codes = {};      // id -> current code string
   var copiedId = null, copiedAt = 0;
 
@@ -331,9 +394,10 @@
     for (var k = 0; k < key.length; k++) h = (h * 31 + key.charCodeAt(k)) >>> 0;
     return '<svg width="40" height="40" viewBox="0 0 40 40">' + letterMark(FALLBACK_COLORS[h % FALLBACK_COLORS.length], esc(letters), letters.length > 1 ? 15 : 20) + "</svg>";
   }
-  function fmt(code) { return code ? code.slice(0, 3) + " " + code.slice(3) : "------"; }
+  function fmt(code) { return code || "------"; }
 
   function render() {
+    if (locked) return;
     var q = (searchEl.value || "").trim().toLowerCase();
     var shown = accounts.filter(function (a) {
       return !q || (a.issuer + " " + a.name).toLowerCase().indexOf(q) !== -1;
@@ -364,6 +428,7 @@
   }
 
   function refreshCodes() {
+    if (locked) return;
     var now = Date.now();
     var jobs = accounts.map(function (a) {
       return totp(a.secret, now, a.digits, a.period, a.algo).then(function (c) { codes[a.id] = c; })
@@ -576,8 +641,164 @@
     reader.readAsText(file);
   });
 
+  /* ---------- app lock (opt-in, off by default) ---------- */
+  function loadLock() {
+    try { var v = JSON.parse(localStorage.getItem(LOCK_KEY) || "null"); return (v && v.on) ? v : null; } catch (e) { return null; }
+  }
+  function saveLock(cfg) { localStorage.setItem(LOCK_KEY, JSON.stringify(cfg)); }
+  function clearLock() { localStorage.removeItem(LOCK_KEY); }
+  var webauthnPlatform = false;
+  if (window.PublicKeyCredential && typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === "function") {
+    PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function (ok) {
+      webauthnPlatform = !!ok; refreshLockUI();
+    }).catch(function () {});
+  }
+  function bufToB64url(buf) {
+    var b = new Uint8Array(buf), s = "";
+    for (var i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function b64urlToBuf(s) {
+    s = s.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    var bin = atob(s), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out.buffer;
+  }
+  function sha256hex(str) {
+    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)).then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+    });
+  }
+  function refreshLockUI() {
+    var on = !!(lockCfg && lockCfg.on);
+    document.getElementById("lockBtn").textContent = on ? "App lock: On" : "App lock: Off";
+    var status = document.getElementById("lockStatus");
+    if (!on) status.textContent = "App lock is off. Turn it on to hide your codes behind fingerprint or a passcode.";
+    else {
+      var methods = [];
+      if (lockCfg.credId) methods.push("fingerprint");
+      if (lockCfg.passHash) methods.push("passcode");
+      status.textContent = "App lock is on (" + methods.join(" + ") + ").";
+    }
+    document.getElementById("fpSetupBtn").style.display = (webauthnPlatform && !(lockCfg && lockCfg.credId)) ? "block" : "none";
+    document.getElementById("lockOffBtn").style.display = on ? "block" : "none";
+    document.getElementById("lockErr").style.display = "none";
+  }
+  function unlock() {
+    locked = false;
+    document.getElementById("lockScreen").classList.remove("open");
+    refreshCodes();
+  }
+  function tryFingerprintUnlock(auto) {
+    if (!lockCfg || !lockCfg.credId) return Promise.resolve(false);
+    var errEl = document.getElementById("unlockErr");
+    return navigator.credentials.get({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        allowCredentials: [{ id: b64urlToBuf(lockCfg.credId), type: "public-key" }],
+        userVerification: "required",
+        timeout: 60000
+      }
+    }).then(function () { unlock(); return true; }).catch(function () {
+      if (!auto) { errEl.textContent = "Fingerprint didn't work — try again or use your passcode."; errEl.style.display = "block"; }
+      return false;
+    });
+  }
+  function showLockScreen() {
+    var hasFp = !!(lockCfg && lockCfg.credId);
+    var hasPass = !!(lockCfg && lockCfg.passHash);
+    if (!hasFp && !hasPass) { clearLock(); lockCfg = null; locked = false; return; }
+    document.getElementById("unlockErr").style.display = "none";
+    document.getElementById("fUnlockPass").value = "";
+    document.getElementById("fpUnlockBtn").style.display = hasFp ? "block" : "none";
+    document.getElementById("passUnlock").style.display = hasPass ? "block" : "none";
+    document.getElementById("lockScreen").classList.add("open");
+    if (hasFp) tryFingerprintUnlock(true);
+  }
+  document.getElementById("aboutBtn").addEventListener("click", function () {
+    menu.classList.remove("open");
+    document.getElementById("aboutOverlay").classList.add("open");
+  });
+  document.getElementById("aboutCloseBtn").addEventListener("click", function () {
+    document.getElementById("aboutOverlay").classList.remove("open");
+  });
+  document.getElementById("aboutOverlay").addEventListener("click", function (e) {
+    if (e.target === this) this.classList.remove("open");
+  });
+  document.getElementById("lockBtn").addEventListener("click", function () {
+    menu.classList.remove("open");
+    refreshLockUI();
+    document.getElementById("lockOverlay").classList.add("open");
+  });
+  document.getElementById("lockCancelBtn").addEventListener("click", function () {
+    document.getElementById("lockOverlay").classList.remove("open");
+  });
+  document.getElementById("lockOverlay").addEventListener("click", function (e) {
+    if (e.target === this) this.classList.remove("open");
+  });
+  document.getElementById("fpSetupBtn").addEventListener("click", function () {
+    var errEl = document.getElementById("lockErr");
+    errEl.style.display = "none";
+    navigator.credentials.create({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp: { name: "Authr" },
+        user: { id: crypto.getRandomValues(new Uint8Array(16)), name: "authr-user", displayName: "Authr user" },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "preferred" },
+        timeout: 60000,
+        attestation: "none"
+      }
+    }).then(function (cred) {
+      var cfg = loadLock() || { on: true };
+      cfg.on = true; cfg.credId = bufToB64url(cred.rawId);
+      saveLock(cfg); lockCfg = cfg;
+      refreshLockUI();
+      alert("Fingerprint set — Authr will ask for it when it opens.");
+    }).catch(function () {
+      errEl.textContent = "Fingerprint setup was cancelled or isn't available on this device — set a passcode below instead.";
+      errEl.style.display = "block";
+    });
+  });
+  document.getElementById("passSetupBtn").addEventListener("click", function () {
+    var p1 = document.getElementById("fPass").value;
+    var p2 = document.getElementById("fPass2").value;
+    var errEl = document.getElementById("lockErr");
+    if (!/^\d{4,}$/.test(p1)) { errEl.textContent = "Passcode must be at least 4 digits."; errEl.style.display = "block"; return; }
+    if (p1 !== p2) { errEl.textContent = "Passcodes don't match — try again."; errEl.style.display = "block"; return; }
+    sha256hex(p1).then(function (h) {
+      var cfg = loadLock() || { on: true };
+      cfg.on = true; cfg.passHash = h;
+      saveLock(cfg); lockCfg = cfg;
+      document.getElementById("fPass").value = "";
+      document.getElementById("fPass2").value = "";
+      refreshLockUI();
+      alert("Passcode set — Authr will ask for it when it opens.");
+    });
+  });
+  document.getElementById("lockOffBtn").addEventListener("click", function () {
+    if (!confirm("Turn off App lock? Your codes will open without unlocking.")) return;
+    clearLock(); lockCfg = null;
+    document.getElementById("lockOverlay").classList.remove("open");
+    refreshLockUI();
+  });
+  document.getElementById("fpUnlockBtn").addEventListener("click", function () { tryFingerprintUnlock(false); });
+  document.getElementById("passUnlockBtn").addEventListener("click", function () {
+    var v = document.getElementById("fUnlockPass").value;
+    var errEl = document.getElementById("unlockErr");
+    sha256hex(v).then(function (h) {
+      if (lockCfg && h === lockCfg.passHash) unlock();
+      else { errEl.textContent = "Wrong passcode — try again."; errEl.style.display = "block"; }
+    });
+  });
+  document.getElementById("fUnlockPass").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") document.getElementById("passUnlockBtn").click();
+  });
+
   /* ---------- tick ---------- */
-  refreshCodes();
+  refreshLockUI();
+  if (locked) showLockScreen(); else refreshCodes();
   setInterval(function () {
     var now = Date.now();
     var remain = 30 - (Math.floor(now / 1000) % 30);
