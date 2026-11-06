@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Authr — 2FA Authenticator</title>
+<meta name="theme-color" content="#4f46e5">
+<meta name="description" content="Authr — a private 2FA authenticator. Add accounts, get 6-digit codes. Everything stays on your device.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #fff; color: #111; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .wrap { width: 100%; max-width: 480px; padding: 24px 20px 16px; flex: 1; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  header img { width: 32px; height: 32px; border-radius: 8px; }
+  header h1 { font-size: 20px; font-weight: 700; letter-spacing: .14em; }
+  header .spacer { flex: 1; }
+  .icon-btn {
+    width: 36px; height: 36px; border: 1px solid #e5e5e5; border-radius: 50%;
+    background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: #111; font-size: 18px; line-height: 1;
+  }
+  .icon-btn:active { background: #f3f3f3; }
+  .sub { color: #666; font-size: 13px; margin: 2px 0 18px; }
+  #search {
+    width: 100%; padding: 11px 14px; font-size: 15px; border: 1px solid #e5e5e5;
+    border-radius: 10px; outline: none; margin-bottom: 14px; background: #fff; color: #111;
+  }
+  #search:focus { border-color: #4f46e5; }
+  #list { display: flex; flex-direction: column; gap: 10px; }
+  .card {
+    border: 1px solid #e5e5e5; border-radius: 14px; padding: 14px 16px;
+    display: flex; align-items: center; gap: 12px; cursor: pointer; background: #fff;
+    position: relative;
+  }
+  .card:active { background: #fafafa; }
+  .card .info { flex: 1; min-width: 0; }
+  .card .issuer { font-size: 13px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 26px; font-weight: 600; letter-spacing: 2px; margin-top: 2px; }
+  .card .code .copied { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: #4f46e5; letter-spacing: 0; margin-left: 8px; }
+  .ring { width: 40px; height: 40px; flex: none; }
+  .ring circle { fill: none; stroke-width: 3; }
+  .ring .bg { stroke: #ececec; }
+  .ring .fg { stroke: #4f46e5; stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; }
+  .ring text { font-size: 11px; font-weight: 600; fill: #111; }
+  .del {
+    position: absolute; top: 6px; right: 8px; border: none; background: none; color: #bbb;
+    font-size: 18px; cursor: pointer; padding: 4px; line-height: 1;
+  }
+  .del:hover { color: #e00; }
+  .empty { text-align: center; color: #888; font-size: 14px; padding: 48px 16px; line-height: 1.6; }
+  .empty b { color: #111; }
+  .fab {
+    position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; border-radius: 50%;
+    background: #4f46e5; color: #fff; border: none; font-size: 30px; line-height: 1; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(79,70,229,.35); display: flex; align-items: center; justify-content: center;
+  }
+  .fab:active { background: #4338ca; }
+  footer { text-align: center; color: #999; font-size: 12px; line-height: 1.6; margin: auto 0 8px; padding-top: 32px; }
+  /* sheet */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; align-items: flex-end; justify-content: center; z-index: 10; }
+  .overlay.open { display: flex; }
+  .sheet { background: #fff; width: 100%; max-width: 480px; border-radius: 20px 20px 0 0; padding: 20px 20px 28px; max-height: 88vh; overflow-y: auto; }
+  .sheet h2 { font-size: 18px; margin-bottom: 4px; }
+  .sheet p.hint { color: #666; font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+  .sheet label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 5px; }
+  .sheet input[type=text] {
+    width: 100%; padding: 11px 12px; font-size: 15px; border: 1px solid #e5e5e5;
+    border-radius: 10px; outline: none; background: #fff; color: #111;
+  }
+  .sheet input[type=text]:focus { border-color: #4f46e5; }
+  .sheet input.mono { font-family: ui-monospace, Menlo, Consolas, monospace; text-transform: uppercase; }
+  .btn {
+    width: 100%; padding: 13px; margin-top: 18px; border: none; border-radius: 12px;
+    background: #4f46e5; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
+  }
+  .btn:active { background: #4338ca; }
+  .btn.ghost { background: #f3f3f3; color: #111; margin-top: 10px; }
+  .btn.ghost:active { background: #e9e9e9; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 6px; }
+  .tabs button {
+    flex: 1; padding: 10px; border: 1px solid #e5e5e5; border-radius: 10px; background: #fff;
+    font-size: 14px; font-weight: 600; cursor: pointer; color: #111;
+  }
+  .tabs button.active { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+  #scanBox { display: none; }
+  #scanBox video { width: 100%; border-radius: 12px; background: #000; margin-top: 8px; }
+  #scanBox .scan-msg { font-size: 13px; color: #666; margin-top: 8px; text-align: center; }
+  .err { color: #c00; font-size: 13px; margin-top: 10px; display: none; }
+  .menu { display: none; position: absolute; top: 64px; right: 20px; background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.12); z-index: 5; overflow: hidden; }
+  .menu.open { display: block; }
+  .menu button { display: block; width: 100%; text-align: left; padding: 12px 16px; background: #fff; border: none; font-size: 14px; cursor: pointer; color: #111; }
+  .menu button:active { background: #f3f3f3; }
+  @media (max-width: 480px) {
+    .wrap { padding: 20px 16px 12px; }
+    .card .code { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="icons/icon-192.png" alt="Authr logo">
+    <h1>AUTHR</h1>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="menuBtn" title="Backup &amp; restore" aria-label="Menu">&#8942;</button>
+  </header>
+  <div class="menu" id="menu">
+    <button id="exportBtn">Export backup (JSON)</button>
+    <button id="importBtn">Import backup</button>
+    <input type="file" id="importFile" accept=".json,application/json" hidden>
+  </div>
+  <p class="sub">Your 2FA codes. Everything stays on this device.</p>
+  <input type="text" id="search" placeholder="Search accounts" autocomplete="off">
+  <div id="list"></div>
+  <div class="empty" id="empty" style="display:none">
+    <b>No accounts yet.</b><br>Tap <b>+</b> to add your first account —<br>paste its secret key or scan its QR code.
+  </div>
+  <footer>Codes are generated on this device only.<br>Secrets never leave your browser — export a backup.</footer>
+</div>
+
+<button class="fab" id="addBtn" title="Add account" aria-label="Add account">+</button>
+
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <h2>Add account</h2>
+    <p class="hint">Enter the details from the site or app giving you the 2FA code. The secret key is the long code shown next to its QR code.</p>
+    <div class="tabs">
+      <button id="tabManual" class="active">Enter key</button>
+      <button id="tabScan">Scan QR</button>
+    </div>
+    <div id="manualBox">
+      <label for="fIssuer">Service (e.g. GitHub)</label>
+      <input type="text" id="fIssuer" placeholder="GitHub" autocomplete="off">
+      <label for="fName">Account name (e.g. your username)</label>
+      <input type="text" id="fName" placeholder="sauravhhh" autocomplete="off">
+      <label for="fSecret">Secret key</label>
+      <input type="text" id="fSecret" class="mono" placeholder="JBSW Y3DP EHPK 3PXP" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <label for="fOtp">Or paste an otpauth:// link</label>
+      <input type="text" id="fOtp" placeholder="otpauth://totp/..." autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="err" id="formErr"></div>
+      <button class="btn" id="saveBtn">Add account</button>
+    </div>
+    <div id="scanBox">
+      <video id="video" playsinline muted></video>
+      <canvas id="canvas" hidden></canvas>
+      <p class="scan-msg" id="scanMsg">Point your camera at the QR code.</p>
+      <div class="err" id="scanErr"></div>
+    </div>
+    <button class="btn ghost" id="cancelBtn">Cancel</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+(function () {
+  "use strict";
+  var LS_KEY = "authr.accounts.v1";
+
+  /* ---------- base32 ---------- */
+  var B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  function base32Decode(str) {
+    var clean = str.replace(/[\s\-=]/g, "").toUpperCase();
+    if (!/^[A-Z2-7]*$/.test(clean) || clean.length === 0) throw new Error("bad secret");
+    var bits = "", out = [];
+    for (var i = 0; i < clean.length; i++) {
+      var v = B32.indexOf(clean[i]);
+      if (v < 0) throw new Error("bad secret");
+      bits += ("00000" + v.toString(2)).slice(-5);
+    }
+    for (var j = 0; j + 8 <= bits.length; j += 8) out.push(parseInt(bits.slice(j, j + 8), 2));
+    return new Uint8Array(out);
+  }
+
+  /* ---------- TOTP (RFC 6238, SHA-1 default) ---------- */
+  function hotp(keyBytes, counter, digits, algo) {
+    var buf = new ArrayBuffer(8), view = new DataView(buf);
+    view.setUint32(0, Math.floor(counter / 4294967296));
+    view.setUint32(4, counter >>> 0);
+    return crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: { name: algo || "SHA-1" } }, false, ["sign"])
+      .then(function (key) { return crypto.subtle.sign("HMAC", key, buf); })
+      .then(function (sig) {
+        var h = new Uint8Array(sig);
+        var o = h[h.length - 1] & 0x0f;
+        var code = ((h[o] & 0x7f) << 24) | ((h[o + 1] & 0xff) << 16) | ((h[o + 2] & 0xff) << 8) | (h[o + 3] & 0xff);
+        var s = String(code % Math.pow(10, digits || 6));
+        while (s.length < (digits || 6)) s = "0" + s;
+        return s;
+      });
+  }
+  function totp(secret, whenMs, digits, period, algo) {
+    var key = base32Decode(secret);
+    var counter = Math.floor((whenMs || Date.now()) / 1000 / (period || 30));
+    return hotp(key, counter, digits || 6, algo || "SHA-1");
+  }
+  // exposed for testing: totp(secret, ms) -> Promise<string>
+  window.__totpForTest = totp;
+
+  /* ---------- storage ---------- */
+  function load() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function save(list) { localStorage.setItem(LS_KEY, JSON.stringify(list)); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  /* ---------- state ---------- */
+  var accounts = load();
+  var codes = {};      // id -> current code string
+  var copiedId = null, copiedAt = 0;
+
+  var listEl = document.getElementById("list");
+  var emptyEl = document.getElementById("empty");
+  var searchEl = document.getElementById("search");
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function fmt(code) { return code ? code.slice(0, 3) + " " + code.slice(3) : "------"; }
+
+  function render() {
+    var q = (searchEl.value || "").trim().toLowerCase();
+    var shown = accounts.filter(function (a) {
+      return !q || (a.issuer + " " + a.name).toLowerCase().indexOf(q) !== -1;
+    });
+    emptyEl.style.display = accounts.length === 0 ? "block" : "none";
+    if (accounts.length === 0) { listEl.innerHTML = ""; return; }
+    if (shown.length === 0) { listEl.innerHTML = '<div class="empty">No accounts match that search.</div>'; return; }
+    var now = Date.now();
+    var period = 30;
+    var remain = period - (Math.floor(now / 1000) % period);
+    var frac = remain / period;
+    var html = "";
+    shown.forEach(function (a) {
+      var code = codes[a.id] || "";
+      var copied = copiedId === a.id && (now - copiedAt) < 2000;
+      html += '<div class="card" data-id="' + esc(a.id) + '">'
+        + '<button class="del" data-del="' + esc(a.id) + '" title="Delete">&#215;</button>'
+        + '<div class="info"><div class="issuer">' + esc(a.issuer || "Account") + '</div>'
+        + '<div class="name">' + esc(a.name || "") + '</div>'
+        + '<div class="code">' + fmt(code) + (copied ? '<span class="copied">Copied</span>' : "") + '</div></div>'
+        + '<svg class="ring" viewBox="0 0 40 40"><circle class="bg" cx="20" cy="20" r="16"/>'
+        + '<circle class="fg" cx="20" cy="20" r="16" stroke-dasharray="' + (100.53 * frac).toFixed(1) + ' 100.53"/>'
+        + '<text x="20" y="24" text-anchor="middle">' + remain + '</text></svg>'
+        + '</div>';
+    });
+    listEl.innerHTML = html;
+  }
+
+  function refreshCodes() {
+    var now = Date.now();
+    var jobs = accounts.map(function (a) {
+      return totp(a.secret, now, a.digits, a.period, a.algo).then(function (c) { codes[a.id] = c; })
+        .catch(function () { codes[a.id] = ""; });
+    });
+    Promise.all(jobs).then(render);
+  }
+
+  /* ---------- add / delete ---------- */
+  function parseOtpAuth(url) {
+    var u = url.trim();
+    if (u.slice(0, 10).toLowerCase() !== "otpauth://") return null;
+    var rest = u.slice(10);
+    var qi = rest.indexOf("?");
+    var label = decodeURIComponent((qi >= 0 ? rest.slice(0, qi) : rest).replace(/^totp\//i, ""));
+    var params = {};
+    if (qi >= 0) rest.slice(qi + 1).split("&").forEach(function (pair) {
+      var kv = pair.split("=");
+      if (kv[0]) params[decodeURIComponent(kv[0]).toLowerCase()] = decodeURIComponent(kv[1] || "");
+    });
+    if (!params.secret) return null;
+    var issuer = params.issuer || "", name = label;
+    if (label.indexOf(":") !== -1) {
+      var parts = label.split(":");
+      if (!issuer) issuer = parts[0];
+      name = parts.slice(1).join(":").trim();
+    }
+    return {
+      issuer: issuer, name: name, secret: params.secret,
+      digits: parseInt(params.digits, 10) || 6,
+      period: parseInt(params.period, 10) || 30,
+      algo: (params.algorithm || "SHA1").toUpperCase().replace("-", "")
+    };
+  }
+
+  function addAccount(acct) {
+    if (!acct.secret) return "Missing secret key.";
+    try { base32Decode(acct.secret); } catch (e) { return "That secret key doesn't look right — check it and try again."; }
+    if (accounts.some(function (a) { return a.issuer === acct.issuer && a.name === acct.name && a.secret === acct.secret; }))
+      return "That account is already added.";
+    accounts.push({
+      id: uid(), issuer: acct.issuer || "Account", name: acct.name || "",
+      secret: acct.secret.replace(/[\s\-]/g, "").toUpperCase(),
+      digits: acct.digits || 6, period: acct.period || 30, algo: acct.algo || "SHA-1"
+    });
+    save(accounts);
+    refreshCodes();
+    return null;
+  }
+
+  /* ---------- sheet ---------- */
+  var overlay = document.getElementById("overlay");
+  var stream = null, scanning = false;
+  function openSheet() {
+    overlay.classList.add("open");
+    document.getElementById("formErr").style.display = "none";
+    document.getElementById("scanErr").style.display = "none";
+    showTab("manual");
+  }
+  function closeSheet() { overlay.classList.remove("open"); stopScan(); }
+  function showTab(which) {
+    document.getElementById("tabManual").classList.toggle("active", which === "manual");
+    document.getElementById("tabScan").classList.toggle("active", which === "scan");
+    document.getElementById("manualBox").style.display = which === "manual" ? "block" : "none";
+    document.getElementById("scanBox").style.display = which === "scan" ? "block" : "none";
+    if (which === "scan") startScan(); else stopScan();
+  }
+
+  document.getElementById("addBtn").addEventListener("click", openSheet);
+  document.getElementById("cancelBtn").addEventListener("click", closeSheet);
+  overlay.addEventListener("click", function (e) { if (e.target === overlay) closeSheet(); });
+  document.getElementById("tabManual").addEventListener("click", function () { showTab("manual"); });
+  document.getElementById("tabScan").addEventListener("click", function () { showTab("scan"); });
+
+  document.getElementById("saveBtn").addEventListener("click", function () {
+    var errEl = document.getElementById("formErr");
+    var otpVal = document.getElementById("fOtp").value.trim();
+    var err = null;
+    if (otpVal) {
+      var parsed = parseOtpAuth(otpVal);
+      if (!parsed) err = "That otpauth:// link doesn't look right.";
+      else err = addAccount(parsed);
+    } else {
+      err = addAccount({
+        issuer: document.getElementById("fIssuer").value.trim(),
+        name: document.getElementById("fName").value.trim(),
+        secret: document.getElementById("fSecret").value.trim()
+      });
+    }
+    if (err) { errEl.textContent = err; errEl.style.display = "block"; return; }
+    document.getElementById("fIssuer").value = "";
+    document.getElementById("fName").value = "";
+    document.getElementById("fSecret").value = "";
+    document.getElementById("fOtp").value = "";
+    closeSheet();
+  });
+
+  /* ---------- QR scan ---------- */
+  function startScan() {
+    var errEl = document.getElementById("scanErr");
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      errEl.textContent = "This browser can't open the camera — enter the key by hand instead.";
+      errEl.style.display = "block"; return;
+    }
+    if (typeof jsQR === "undefined") {
+      errEl.textContent = "QR library didn't load (needs internet once) — enter the key by hand instead.";
+      errEl.style.display = "block"; return;
+    }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function (s) {
+      stream = s;
+      var video = document.getElementById("video");
+      video.srcObject = s;
+      video.play();
+      scanning = true;
+      scanLoop();
+    }).catch(function () {
+      errEl.textContent = "Camera access was blocked — allow it, or enter the key by hand instead.";
+      errEl.style.display = "block";
+    });
+  }
+  function stopScan() {
+    scanning = false;
+    if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+  }
+  function scanLoop() {
+    if (!scanning) return;
+    var video = document.getElementById("video");
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      var canvas = document.getElementById("canvas");
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      var ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      var data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      var res = jsQR(data.data, data.width, data.height);
+      if (res && res.data) {
+        var parsed = parseOtpAuth(res.data);
+        if (parsed) {
+          var err = addAccount(parsed);
+          if (err) { document.getElementById("scanMsg").textContent = err; }
+          else { closeSheet(); return; }
+        } else {
+          document.getElementById("scanMsg").textContent = "That QR code isn't a 2FA setup code — try another.";
+        }
+      }
+    }
+    requestAnimationFrame(scanLoop);
+  }
+
+  /* ---------- list actions ---------- */
+  listEl.addEventListener("click", function (e) {
+    var delBtn = e.target.closest("[data-del]");
+    if (delBtn) {
+      e.stopPropagation();
+      var id = delBtn.getAttribute("data-del");
+      var acct = accounts.find(function (a) { return a.id === id; });
+      if (acct && confirm("Delete " + (acct.issuer || "this account") + (acct.name ? " (" + acct.name + ")" : "") + "?")) {
+        accounts = accounts.filter(function (a) { return a.id !== id; });
+        save(accounts); render();
+      }
+      return;
+    }
+    var card = e.target.closest(".card");
+    if (!card) return;
+    var id2 = card.getAttribute("data-id");
+    var code = (codes[id2] || "").replace(/\s/g, "");
+    if (!code) return;
+    var done = function () { copiedId = id2; copiedAt = Date.now(); render(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(done).catch(function () { fallbackCopy(code); done(); });
+    } else { fallbackCopy(code); done(); }
+  });
+  function fallbackCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  searchEl.addEventListener("input", render);
+
+  /* ---------- backup menu ---------- */
+  var menuBtn = document.getElementById("menuBtn"), menu = document.getElementById("menu");
+  menuBtn.addEventListener("click", function (e) { e.stopPropagation(); menu.classList.toggle("open"); });
+  document.addEventListener("click", function (e) { if (!menu.contains(e.target)) menu.classList.remove("open"); });
+  document.getElementById("exportBtn").addEventListener("click", function () {
+    menu.classList.remove("open");
+    var blob = new Blob([JSON.stringify({ app: "authr", version: 1, accounts: accounts }, null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "authr-backup.json"; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+  document.getElementById("importBtn").addEventListener("click", function () {
+    menu.classList.remove("open");
+    document.getElementById("importFile").click();
+  });
+  document.getElementById("importFile").addEventListener("change", function (e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var data = JSON.parse(reader.result);
+        var list = data.accounts || data;
+        if (!Array.isArray(list)) throw new Error("bad file");
+        var added = 0;
+        list.forEach(function (item) {
+          if (!item.secret) return;
+          var err = addAccount(item);
+          if (!err) added++;
+        });
+        alert(added ? added + " account(s) imported." : "No new accounts in that file.");
+      } catch (ex) { alert("That file isn't a valid Authr backup."); }
+      e.target.value = "";
+    };
+    reader.readAsText(file);
+  });
+
+  /* ---------- tick ---------- */
+  refreshCodes();
+  setInterval(function () {
+    var now = Date.now();
+    var remain = 30 - (Math.floor(now / 1000) % 30);
+    if (remain === 30) refreshCodes(); else render();
+  }, 1000);
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
