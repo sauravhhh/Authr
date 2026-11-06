@@ -1,4 +1,4 @@
-var CACHE = "authr-cache-v3";
+var CACHE = "authr-cache-v4";
 var FILES = [
   "index.html",
   "manifest.json",
