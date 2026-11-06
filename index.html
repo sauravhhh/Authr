@@ -42,6 +42,8 @@
   }
   .card:active { background: #fafafa; }
   .card .info { flex: 1; min-width: 0; }
+  .thumb { width: 40px; height: 40px; flex: none; }
+  .thumb svg { display: block; border-radius: 10px; }
   .card .issuer { font-size: 13px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .card .name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .card .code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 26px; font-weight: 600; letter-spacing: 2px; margin-top: 2px; }
@@ -92,7 +94,6 @@
   }
   .tabs button.active { background: #4f46e5; border-color: #4f46e5; color: #fff; }
   #scanBox { display: none; }
-  #scanBox video { width: 100%; border-radius: 12px; background: #000; margin-top: 8px; }
   #scanBox .scan-msg { font-size: 13px; color: #666; margin-top: 8px; text-align: center; }
   .err { color: #c00; font-size: 13px; margin-top: 10px; display: none; }
   .menu { display: none; position: absolute; top: 64px; right: 20px; background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.12); z-index: 5; overflow: hidden; }
@@ -106,6 +107,7 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="igGrad" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#feda75"/><stop offset=".45" stop-color="#d62976"/><stop offset="1" stop-color="#4f5bd5"/></linearGradient></defs></svg>
 <div class="wrap">
   <header>
     <img src="icons/icon-192.png" alt="Authr logo">
@@ -135,7 +137,7 @@
     <p class="hint">Enter the details from the site or app giving you the 2FA code. The secret key is the long code shown next to its QR code.</p>
     <div class="tabs">
       <button id="tabManual" class="active">Enter key</button>
-      <button id="tabScan">Scan QR</button>
+      <button id="tabScan">Upload QR</button>
     </div>
     <div id="manualBox">
       <label for="fIssuer">Service (e.g. GitHub)</label>
@@ -148,9 +150,8 @@
       <button class="btn" id="saveBtn">Add account</button>
     </div>
     <div id="scanBox">
-      <video id="video" playsinline muted></video>
       <canvas id="canvas" hidden></canvas>
-      <p class="scan-msg" id="scanMsg">Point your camera at the QR code.</p>
+      <p class="scan-msg" id="scanMsg">Pick a QR code image from your gallery.</p>
       <button class="btn ghost" id="uploadBtn" type="button">Upload from gallery</button>
       <input type="file" id="galleryFile" accept="image/*" hidden>
       <div class="err" id="scanErr"></div>
@@ -225,6 +226,111 @@
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
   }
+
+  /* ---------- service thumbnails ---------- */
+  function letterMark(bg, text, size, fg) {
+    return '<rect width="40" height="40" rx="10" fill="' + bg + '"/>'
+      + '<text x="20" y="27" text-anchor="middle" font-size="' + (size || 22) + '" font-weight="800" fill="' + (fg || "#fff") + '" font-family="Arial, Helvetica, sans-serif">' + text + '</text>';
+  }
+  var BRANDS = {
+    facebook: letterMark("#1877F2", "f", 26),
+    instagram: '<rect width="40" height="40" rx="10" fill="url(#igGrad)"/>'
+      + '<rect x="10" y="10" width="20" height="20" rx="6" fill="none" stroke="#fff" stroke-width="2.2"/>'
+      + '<circle cx="20" cy="20" r="5" fill="none" stroke="#fff" stroke-width="2.2"/>'
+      + '<circle cx="26.5" cy="13.5" r="1.6" fill="#fff"/>',
+    x: '<rect width="40" height="40" rx="10" fill="#000"/>'
+      + '<path d="M12 12 L28 28 M28 12 L12 28" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>',
+    pinterest: letterMark("#E60023", "P"),
+    gmail: '<rect width="40" height="40" rx="10" fill="#EA4335"/>'
+      + '<rect x="9" y="12" width="22" height="16" rx="2" fill="none" stroke="#fff" stroke-width="2.2"/>'
+      + '<path d="M10 14 L20 22 L30 14" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>',
+    outlook: letterMark("#0078D4", "O"),
+    yahoo: letterMark("#6001D2", "Y!", 18),
+    google: letterMark("#4285F4", "G"),
+    github: letterMark("#181717", "GH", 13),
+    whatsapp: letterMark("#25D366", "W", 20),
+    telegram: '<rect width="40" height="40" rx="10" fill="#229ED9"/>'
+      + '<path d="M31 9 L8 19 L15 23 L18 30 L22 24 L29 29 Z" fill="#fff"/>',
+    linkedin: letterMark("#0A66C2", "in", 19),
+    snapchat: letterMark("#FFFC00", "S", 22, "#000"),
+    discord: letterMark("#5865F2", "D"),
+    amazon: letterMark("#FF9900", "a"),
+    netflix: letterMark("#E50914", "N"),
+    spotify: '<rect width="40" height="40" rx="10" fill="#1DB954"/>'
+      + '<path d="M10 16 Q20 12 30 16 M10 21 Q20 17 30 21 M10 26 Q20 22 30 26" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/>',
+    microsoft: '<rect width="40" height="40" rx="10" fill="#f3f3f3"/>'
+      + '<rect x="10" y="10" width="9" height="9" fill="#F25022"/><rect x="21" y="10" width="9" height="9" fill="#7FBA00"/>'
+      + '<rect x="10" y="21" width="9" height="9" fill="#00A4EF"/><rect x="21" y="21" width="9" height="9" fill="#FFB900"/>',
+    apple: '<rect width="40" height="40" rx="10" fill="#000"/>'
+      + '<path transform="translate(5,1) scale(0.078)" fill="#fff" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c6.8 20.7 31.9 72.1 85.7 72.1 21.1 0 50.8-16.3 84.9-16.3 34 0 67.4 16.6 86.5 16.6 37.7 0 79.3-64.3 86.7-90.6-54.2-19.6-86.1-51.6-86.1-93.7z"/>',
+    reddit: letterMark("#FF4500", "r"),
+    steam: letterMark("#1b2838", "S"),
+    slack: letterMark("#4A154B", "#"),
+    zoom: letterMark("#2D8CFF", "Z"),
+    dropbox: '<rect width="40" height="40" rx="10" fill="#0061FF"/>'
+      + '<path d="M20 9 L31 15 L20 21 L9 15 Z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>'
+      + '<path d="M9 15 L9 24 L20 30 L31 24 L31 15" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>',
+    paypal: letterMark("#003087", "P"),
+    phonepe: letterMark("#5f259f", "Pe", 16),
+    paytm: letterMark("#00B9F1", "P"),
+    binance: '<rect width="40" height="40" rx="10" fill="#F0B90B"/>'
+      + '<path d="M20 10 L30 20 L20 30 L10 20 Z" fill="#111"/>',
+    coinbase: letterMark("#0052FF", "C")
+  };
+  var BRAND_ALIASES = {
+    facebook: ["facebook", "fb", "meta"],
+    instagram: ["instagram", "insta", "ig"],
+    x: ["twitter", "x"],
+    pinterest: ["pinterest"],
+    gmail: ["gmail", "googlemail"],
+    google: ["google"],
+    outlook: ["outlook", "hotmail", "live", "msn", "microsoft365", "office365"],
+    yahoo: ["yahoo", "ymail"],
+    github: ["github"],
+    whatsapp: ["whatsapp", "wa"],
+    telegram: ["telegram", "tg"],
+    linkedin: ["linkedin"],
+    snapchat: ["snapchat"],
+    discord: ["discord"],
+    amazon: ["amazon"],
+    netflix: ["netflix"],
+    spotify: ["spotify"],
+    microsoft: ["microsoft", "ms"],
+    apple: ["apple", "appleid"],
+    reddit: ["reddit"],
+    steam: ["steam"],
+    slack: ["slack"],
+    zoom: ["zoom"],
+    dropbox: ["dropbox"],
+    paypal: ["paypal"],
+    phonepe: ["phonepe"],
+    paytm: ["paytm"],
+    binance: ["binance"],
+    coinbase: ["coinbase"]
+  };
+  var FALLBACK_COLORS = ["#4f46e5", "#0e7490", "#b45309", "#be185d", "#15803d", "#6d28d9", "#b91c1c", "#334155"];
+  function thumbFor(acct) {
+    var label = (acct.issuer && acct.issuer !== "Account") ? acct.issuer : (acct.name || "");
+    var key = String(label).toLowerCase().replace(/[^a-z0-9]/g, "");
+    var brand = null;
+    if (key) {
+      var names = Object.keys(BRAND_ALIASES);
+      for (var i = 0; i < names.length; i++) {
+        if (BRAND_ALIASES[names[i]].indexOf(key) !== -1) { brand = names[i]; break; }
+      }
+      if (!brand && key.length >= 3) {
+        for (var j = 0; j < names.length; j++) {
+          if (key.indexOf(names[j]) !== -1 || names[j].indexOf(key) !== -1) { brand = names[j]; break; }
+        }
+      }
+    }
+    if (brand) return '<svg width="40" height="40" viewBox="0 0 40 40">' + BRANDS[brand] + "</svg>";
+    var words = String(label || "?").trim().split(/\s+/);
+    var letters = words.length > 1 ? (words[0][0] + words[1][0]).toUpperCase() : String(label || "?").slice(0, 2).toUpperCase();
+    var h = 0;
+    for (var k = 0; k < key.length; k++) h = (h * 31 + key.charCodeAt(k)) >>> 0;
+    return '<svg width="40" height="40" viewBox="0 0 40 40">' + letterMark(FALLBACK_COLORS[h % FALLBACK_COLORS.length], esc(letters), letters.length > 1 ? 15 : 20) + "</svg>";
+  }
   function fmt(code) { return code ? code.slice(0, 3) + " " + code.slice(3) : "------"; }
 
   function render() {
@@ -245,6 +351,7 @@
       var copied = copiedId === a.id && (now - copiedAt) < 2000;
       html += '<div class="card" data-id="' + esc(a.id) + '">'
         + '<button class="del" data-del="' + esc(a.id) + '" title="Delete">&#215;</button>'
+        + '<div class="thumb">' + thumbFor(a) + '</div>'
         + '<div class="info"><div class="issuer">' + esc(a.issuer || "Account") + '</div>'
         + '<div class="name">' + esc(a.name || "") + '</div>'
         + '<div class="code">' + fmt(code) + (copied ? '<span class="copied">Copied</span>' : "") + '</div></div>'
@@ -317,20 +424,18 @@
 
   /* ---------- sheet ---------- */
   var overlay = document.getElementById("overlay");
-  var stream = null, scanning = false;
   function openSheet() {
     overlay.classList.add("open");
     document.getElementById("formErr").style.display = "none";
     document.getElementById("scanErr").style.display = "none";
     showTab("manual");
   }
-  function closeSheet() { overlay.classList.remove("open"); stopScan(); }
+  function closeSheet() { overlay.classList.remove("open"); }
   function showTab(which) {
     document.getElementById("tabManual").classList.toggle("active", which === "manual");
     document.getElementById("tabScan").classList.toggle("active", which === "scan");
     document.getElementById("manualBox").style.display = which === "manual" ? "block" : "none";
     document.getElementById("scanBox").style.display = which === "scan" ? "block" : "none";
-    if (which === "scan") startScan(); else stopScan();
   }
 
   document.getElementById("addBtn").addEventListener("click", openSheet);
@@ -352,57 +457,6 @@
     document.getElementById("fSecret").value = "";
     closeSheet();
   });
-
-  /* ---------- QR scan ---------- */
-  function startScan() {
-    var errEl = document.getElementById("scanErr");
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      errEl.textContent = "This browser can't open the camera — enter the key by hand instead.";
-      errEl.style.display = "block"; return;
-    }
-    if (typeof jsQR === "undefined") {
-      errEl.textContent = "QR library didn't load (needs internet once) — enter the key by hand instead.";
-      errEl.style.display = "block"; return;
-    }
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function (s) {
-      stream = s;
-      var video = document.getElementById("video");
-      video.srcObject = s;
-      video.play();
-      scanning = true;
-      scanLoop();
-    }).catch(function () {
-      errEl.textContent = "Camera access was blocked — allow it, or enter the key by hand instead.";
-      errEl.style.display = "block";
-    });
-  }
-  function stopScan() {
-    scanning = false;
-    if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
-  }
-  function scanLoop() {
-    if (!scanning) return;
-    var video = document.getElementById("video");
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      var canvas = document.getElementById("canvas");
-      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-      var ctx = canvas.getContext("2d");
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      var data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      var res = jsQR(data.data, data.width, data.height);
-      if (res && res.data) {
-        var parsed = parseOtpAuth(res.data);
-        if (parsed) {
-          var err = addAccount(parsed);
-          if (err) { document.getElementById("scanMsg").textContent = err; }
-          else { closeSheet(); return; }
-        } else {
-          document.getElementById("scanMsg").textContent = "That QR code isn't a 2FA setup code — try another.";
-        }
-      }
-    }
-    requestAnimationFrame(scanLoop);
-  }
 
   /* ---------- gallery upload ---------- */
   document.getElementById("uploadBtn").addEventListener("click", function () {
