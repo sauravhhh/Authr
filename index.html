@@ -65,7 +65,8 @@
     z-index: 5; overflow: hidden; min-width: 120px;
   }
   .kebab-menu.open { display: block; }
-  .kebab-menu button { display: block; width: 100%; text-align: left; padding: 11px 14px; background: #fff; border: none; font-size: 14px; cursor: pointer; color: #c00; }
+  .kebab-menu button { display: block; width: 100%; text-align: left; padding: 11px 14px; background: #fff; border: none; font-size: 14px; cursor: pointer; color: #111; }
+  .kebab-menu button[data-del] { color: #c00; }
   .kebab-menu button:active { background: #f3f3f3; }
   .empty { text-align: center; color: #888; font-size: 14px; padding: 48px 16px; line-height: 1.6; }
   .empty b { color: #111; }
@@ -187,6 +188,20 @@
   </div>
 </div>
 
+<div class="overlay" id="editOverlay">
+  <div class="sheet">
+    <h2>Edit account</h2>
+    <p class="hint">Change how this account appears in your list. The secret key stays the same.</p>
+    <label for="editIssuer">Service (e.g. GitHub)</label>
+    <input type="text" id="editIssuer" placeholder="GitHub" autocomplete="off">
+    <label for="editName">Account name (e.g. your username)</label>
+    <input type="text" id="editName" placeholder="Account name" autocomplete="off">
+    <div class="err" id="editErr"></div>
+    <button class="btn" id="editSaveBtn">Save changes</button>
+    <button class="btn ghost" id="editCancelBtn">Cancel</button>
+  </div>
+</div>
+
 <div class="overlay" id="aboutOverlay">
   <div class="sheet">
     <h2>About Authr</h2>
@@ -294,6 +309,7 @@
   var codes = {};      // id -> current code string
   var copiedId = null, copiedAt = 0;
   var openMenuId = null;  // id of the account whose kebab menu is open (survives re-render)
+  var editingId = null;   // id of the account being edited
 
   var listEl = document.getElementById("list");
   var emptyEl = document.getElementById("empty");
@@ -462,7 +478,7 @@
         + '<text x="20" y="24" text-anchor="middle">' + remain + '</text></svg>'
         + '</div>'
         + '<div class="card-bottom"><div class="name">' + esc(a.name || "") + '</div></div>'
-        + '<div class="kebab-menu' + (openMenuId === a.id ? " open" : "") + '"><button data-del="' + esc(a.id) + '">Delete</button></div>'
+        + '<div class="kebab-menu' + (openMenuId === a.id ? " open" : "") + '"><button data-edit="' + esc(a.id) + '">Edit</button><button data-del="' + esc(a.id) + '">Delete</button></div>'
         + '</div>';
     });
     listEl.innerHTML = html;
@@ -564,6 +580,26 @@
     closeSheet();
   });
 
+  /* ---------- edit account ---------- */
+  var editOverlay = document.getElementById("editOverlay");
+  function closeEditSheet() { editOverlay.classList.remove("open"); editingId = null; }
+  document.getElementById("editCancelBtn").addEventListener("click", closeEditSheet);
+  editOverlay.addEventListener("click", function (e) { if (e.target === editOverlay) closeEditSheet(); });
+  document.getElementById("editSaveBtn").addEventListener("click", function () {
+    var errEl = document.getElementById("editErr");
+    if (!editingId) { closeEditSheet(); return; }
+    var acct = accounts.find(function (a) { return a.id === editingId; });
+    if (!acct) { closeEditSheet(); return; }
+    var issuer = document.getElementById("editIssuer").value.trim();
+    var name = document.getElementById("editName").value.trim();
+    if (!issuer && !name) { errEl.textContent = "Enter a service or an account name."; errEl.style.display = "block"; return; }
+    acct.issuer = issuer || "Account";
+    acct.name = name;
+    save(accounts);
+    closeEditSheet();
+    render();
+  });
+
   /* ---------- gallery upload ---------- */
   document.getElementById("uploadBtn").addEventListener("click", function () {
     document.getElementById("galleryFile").click();
@@ -619,6 +655,21 @@
       e.stopPropagation();
       var kid = kebabBtn.getAttribute("data-kebab");
       openMenuId = (openMenuId === kid) ? null : kid;
+      render();
+      return;
+    }
+    var editBtn = e.target.closest("[data-edit]");
+    if (editBtn) {
+      e.stopPropagation();
+      openMenuId = null;
+      var eid = editBtn.getAttribute("data-edit");
+      var eacct = accounts.find(function (a) { return a.id === eid; });
+      if (!eacct) return;
+      editingId = eid;
+      document.getElementById("editIssuer").value = eacct.issuer || "";
+      document.getElementById("editName").value = eacct.name || "";
+      document.getElementById("editErr").style.display = "none";
+      document.getElementById("editOverlay").classList.add("open");
       render();
       return;
     }
