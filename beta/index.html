@@ -105,6 +105,9 @@
   .lock-box input[type=password]:focus, .lock-box input[type=text]:focus { border-color: #d32d27; }
   #vaultScreen { position: fixed; inset: 0; background: #fff; z-index: 50; display: none; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 48px 20px; }
   #vaultScreen.open { display: flex; }
+  .pin-row { display: flex; gap: 12px; justify-content: center; margin: 14px 0 6px; }
+  .pin-box { width: 56px; height: 64px; text-align: center; font-size: 28px; font-weight: 700; border: 1.5px solid #d9d9d9; border-radius: 12px; outline: none; background: #fff; color: #111; caret-color: #d32d27; }
+  .pin-box:focus { border-color: #d32d27; box-shadow: 0 0 0 3px rgba(211,45,39,.12); }
   .beta-tag { display: inline-block; background: #D32D27; color: #fff; font-size: 11px; font-weight: 800; letter-spacing: 1px; padding: 2px 7px; border-radius: 4px; vertical-align: middle; margin-left: 6px; }
   .lock-note { color: #999; font-size: 12px; line-height: 1.6; margin-top: 20px; }
   #lockScreen .btn { margin-top: 12px; }
@@ -241,17 +244,32 @@
     <h2 id="vaultTitle">Authr Beta</h2>
     <p class="lock-hint" id="vaultHint">Set a passcode to create your encrypted vault.</p>
     <div id="vaultSetup">
-      <label for="fVaultPass1">Passcode (4+ digits)</label>
-      <input type="password" id="fVaultPass1" inputmode="numeric" autocomplete="off" placeholder="Choose a passcode">
-      <label for="fVaultPass2">Confirm passcode</label>
-      <input type="password" id="fVaultPass2" inputmode="numeric" autocomplete="off" placeholder="Repeat the passcode">
+      <label>Passcode (4 digits)</label>
+      <div class="pin-row" id="pinSetup1">
+        <input type="password" class="pin-box" inputmode="numeric" maxlength="1" autocomplete="off">
+        <input type="password" class="pin-box" inputmode="numeric" maxlength="1" autocomplete="off">
+        <input type="password" class="pin-box" inputmode="numeric" maxlength="1" autocomplete="off">
+        <input type="password" class="pin-box" inputmode="numeric" maxlength="1" autocomplete="off">
+      </div>
+      <label>Confirm passcode</label>
+      <div class="pin-row" id="pinSetup2">
+        <input type="password" class="pin-box" inputmode="numeric" maxlength="1" autocomplete="off">
+        <input type="password" class="pin-box" inputmode="numeric" maxlength="1" autocomplete="off">
+        <input type="password" class="pin-box" inputmode="numeric" maxlength="1" autocomplete="off">
+        <input type="password" class="pin-box" inputmode="numeric" maxlength="1" autocomplete="off">
+      </div>
       <div class="err" id="vaultSetupErr"></div>
       <button class="btn" id="vaultCreateBtn">Create vault</button>
       <p class="lock-note">Your passcode encrypts every secret on this device. If you forget it, there is no recovery — your accounts are gone for good. Write it down somewhere safe.</p>
     </div>
     <div id="vaultUnlock" style="display:none">
-      <label for="fVaultPass">Passcode</label>
-      <input type="password" id="fVaultPass" inputmode="numeric" autocomplete="off" placeholder="Enter passcode">
+      <label>Passcode</label>
+      <div class="pin-row" id="pinUnlock">
+        <input type="password" class="pin-box" inputmode="numeric" maxlength="1" autocomplete="off">
+        <input type="password" class="pin-box" inputmode="numeric" maxlength="1" autocomplete="off">
+        <input type="password" class="pin-box" inputmode="numeric" maxlength="1" autocomplete="off">
+        <input type="password" class="pin-box" inputmode="numeric" maxlength="1" autocomplete="off">
+      </div>
       <div class="err" id="vaultUnlockErr"></div>
       <button class="btn" id="vaultUnlockBtn">Unlock vault</button>
       <p class="lock-note">Forgot your passcode? There is no recovery. Clearing this site's data deletes the encrypted vault and all accounts.</p>
@@ -1098,6 +1116,38 @@
     }
   };
 
+  /* ---------- 4-box PIN ---------- */
+  function pinValue(rowId) {
+    var boxes = document.querySelectorAll("#" + rowId + " .pin-box");
+    var v = "";
+    boxes.forEach(function (b) { v += b.value; });
+    return v;
+  }
+  function clearPin(rowId) {
+    document.querySelectorAll("#" + rowId + " .pin-box").forEach(function (b) { b.value = ""; });
+  }
+  function wirePin(rowId) {
+    var boxes = Array.prototype.slice.call(document.querySelectorAll("#" + rowId + " .pin-box"));
+    boxes.forEach(function (box, i) {
+      box.addEventListener("input", function () {
+        box.value = box.value.replace(/\D/g, "").slice(0, 1);
+        if (box.value && i < boxes.length - 1) boxes[i + 1].focus();
+      });
+      box.addEventListener("keydown", function (e) {
+        if (e.key === "Backspace" && !box.value && i > 0) { boxes[i - 1].focus(); boxes[i - 1].value = ""; }
+        if (e.key === "ArrowLeft" && i > 0) boxes[i - 1].focus();
+        if (e.key === "ArrowRight" && i < boxes.length - 1) boxes[i + 1].focus();
+      });
+      box.addEventListener("paste", function (e) {
+        e.preventDefault();
+        var text = (e.clipboardData || window.clipboardData).getData("text").replace(/\D/g, "").slice(0, 4);
+        text.split("").forEach(function (ch, j) { if (boxes[j]) boxes[j].value = ch; });
+        if (text.length) boxes[Math.min(text.length, 3)].focus();
+      });
+    });
+  }
+  wirePin("pinSetup1"); wirePin("pinSetup2"); wirePin("pinUnlock");
+
   /* ---------- vault startup ---------- */
   var vaultScreenEl = document.getElementById("vaultScreen");
   function showVaultScreen() {
@@ -1122,17 +1172,16 @@
   }
   document.getElementById("vaultCreateBtn").addEventListener("click", function () {
     var errEl = document.getElementById("vaultSetupErr");
-    var p1 = document.getElementById("fVaultPass1").value;
-    var p2 = document.getElementById("fVaultPass2").value;
-    if (!p1 || p1.length < 4) { errEl.textContent = "Passcode must be at least 4 digits."; errEl.style.display = "block"; return; }
+    var p1 = pinValue("pinSetup1");
+    var p2 = pinValue("pinSetup2");
+    if (p1.length !== 4) { errEl.textContent = "Enter all 4 digits."; errEl.style.display = "block"; return; }
     if (p1 !== p2) { errEl.textContent = "Passcodes do not match."; errEl.style.display = "block"; return; }
     var btn = document.getElementById("vaultCreateBtn");
     btn.textContent = "Creating vault..."; btn.disabled = true;
     createVault(p1).then(function () {
       clearFails();
       vaultUnlocked = true;
-      document.getElementById("fVaultPass1").value = "";
-      document.getElementById("fVaultPass2").value = "";
+      clearPin("pinSetup1"); clearPin("pinSetup2");
       btn.textContent = "Create vault"; btn.disabled = false;
       hideVaultScreen();
       armAutoLock();
@@ -1149,22 +1198,22 @@
       errEl.textContent = "Too many wrong attempts. Try again in " + secs + "s.";
       errEl.style.display = "block"; return;
     }
-    var p = document.getElementById("fVaultPass").value;
-    if (!p) { errEl.textContent = "Enter your passcode."; errEl.style.display = "block"; return; }
+    var p = pinValue("pinUnlock");
+    if (p.length !== 4) { errEl.textContent = "Enter all 4 digits."; errEl.style.display = "block"; return; }
     var btn = document.getElementById("vaultUnlockBtn");
     btn.textContent = "Unlocking..."; btn.disabled = true;
     unlockVault(p).then(function (ok) {
       btn.textContent = "Unlock vault"; btn.disabled = false;
       if (!ok) {
         noteFail();
-        document.getElementById("fVaultPass").value = "";
+        clearPin("pinUnlock");
         errEl.textContent = failState.count >= 5 ? "Wrong passcode. Too many attempts — locked out briefly." : "Wrong passcode.";
         errEl.style.display = "block";
         return;
       }
       clearFails();
       vaultUnlocked = true;
-      document.getElementById("fVaultPass").value = "";
+      clearPin("pinUnlock");
       hideVaultScreen();
       armAutoLock();
     });
