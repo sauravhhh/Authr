@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Authr — 2FA Authenticator</title>
+<meta name="theme-color" content="#d32d27">
+<meta name="description" content="Authr — a private 2FA authenticator. Add accounts, get 6-digit codes. Everything stays on your device.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #fff; color: #111; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .wrap { width: 100%; max-width: 480px; padding: 24px 20px 16px; flex: 1; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  header img { width: 32px; height: 32px; border-radius: 8px; }
+  header h1 { font-size: 20px; font-weight: 700; letter-spacing: .14em; }
+  header .spacer { flex: 1; }
+  .icon-btn {
+    width: 36px; height: 36px; border: 1px solid #e5e5e5; border-radius: 50%;
+    background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: #111; font-size: 18px; line-height: 1;
+  }
+  .icon-btn:active { background: #f3f3f3; }
+  .sub { color: #666; font-size: 13px; margin: 2px 0 18px; }
+  #search {
+    width: 100%; padding: 11px 14px; font-size: 15px; border: 1px solid #e5e5e5;
+    border-radius: 10px; outline: none; margin-bottom: 14px; background: #fff; color: #111;
+  }
+  #search:focus { border-color: #d32d27; }
+  #list { display: flex; flex-direction: column; gap: 10px; }
+  .card {
+    border: 1px solid #e5e5e5; border-radius: 14px; padding: 14px 16px 12px;
+    cursor: pointer; background: #fff;
+    position: relative; box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
+  }
+  .card:active { background: #fafafa; }
+  .card-top { display: flex; align-items: center; gap: 10px; }
+  .thumb { width: 40px; height: 40px; flex: none; }
+  .thumb svg { display: block; border-radius: 10px; }
+  .card .issuer { flex: 1; min-width: 0; font-size: 16px; font-weight: 700; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kebab { border: none; background: none; color: #999; font-size: 20px; cursor: pointer; padding: 4px 6px; line-height: 1; flex: none; }
+  .kebab:active { color: #111; }
+  .card-mid { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .card .code { flex: 1; min-width: 0; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 30px; font-weight: 700; letter-spacing: 1px; color: #111; white-space: nowrap; overflow: hidden; }
+  .copy { border: none; background: none; cursor: pointer; padding: 6px; flex: none; line-height: 0; }
+  .copy svg { display: block; }
+  .copied { font-size: 12px; color: #1a73e8; font-weight: 600; flex: none; }
+  .ring { width: 40px; height: 40px; flex: none; }
+  .ring circle { fill: none; stroke-width: 3; }
+  .ring .bg { stroke: #ececec; }
+  .ring .fg { stroke: #1a73e8; stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; }
+  .ring text { font-size: 11px; font-weight: 600; fill: #111; }
+  .card-bottom { margin-top: 8px; }
+  .card .name { font-size: 13px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kebab-menu {
+    display: none; position: absolute; top: 52px; right: 12px; background: #fff;
+    border: 1px solid #e5e5e5; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.14);
+    z-index: 5; overflow: hidden; min-width: 120px;
+  }
+  .kebab-menu.open { display: block; }
+  .kebab-menu button { display: block; width: 100%; text-align: left; padding: 11px 14px; background: #fff; border: none; font-size: 14px; cursor: pointer; color: #111; }
+  .kebab-menu button[data-del] { color: #c00; }
+  .kebab-menu button:active { background: #f3f3f3; }
+  .empty { text-align: center; color: #888; font-size: 14px; padding: 48px 16px; line-height: 1.6; }
+  .empty b { color: #111; }
+  .fab {
+    position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; border-radius: 50%;
+    background: #d32d27; color: #fff; border: none; font-size: 30px; line-height: 1; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(79,70,229,.35); display: flex; align-items: center; justify-content: center;
+  }
+  .fab:active { background: #b71c1c; }
+  footer { text-align: center; color: #999; font-size: 12px; line-height: 1.6; margin: auto 0 8px; padding-top: 32px; }
+  /* sheet */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; align-items: flex-end; justify-content: center; z-index: 10; }
+  .overlay.open { display: flex; }
+  .sheet { background: #fff; width: 100%; max-width: 480px; border-radius: 20px 20px 0 0; padding: 20px 20px 28px; max-height: 88vh; overflow-y: auto; }
+  .sheet h2 { font-size: 18px; margin-bottom: 4px; }
+  .sheet p.hint { color: #666; font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+  .sheet label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 5px; }
+  .sheet input[type=text], .sheet input[type=password] {
+    width: 100%; padding: 11px 12px; font-size: 15px; border: 1px solid #e5e5e5;
+    border-radius: 10px; outline: none; background: #fff; color: #111;
+  }
+  .sheet input[type=text]:focus, .sheet input[type=password]:focus { border-color: #d32d27; }
+  .sheet p.body { color: #333; font-size: 14px; line-height: 1.6; margin-bottom: 10px; }
+  .warn { background: #fef3f2; border: 1px solid #f5c6c2; color: #7a1f1a; font-size: 13px; line-height: 1.5; padding: 10px 12px; border-radius: 10px; margin-bottom: 14px; }
+  .or { text-align: center; color: #999; font-size: 13px; margin: 14px 0 2px; }
+  .sheet a { color: #d32d27; }
+  .link-btn { background: none; border: none; color: #d32d27; font-size: 13px; cursor: pointer; margin-top: 14px; text-decoration: underline; padding: 4px; }
+  #lockScreen { position: fixed; inset: 0; background: #fff; z-index: 60; display: none; align-items: center; justify-content: center; padding: 24px; }
+  #lockScreen.open { display: flex; }
+  .lock-box { width: 100%; max-width: 320px; text-align: center; }
+  .lock-logo { width: 56px; height: 56px; border-radius: 14px; margin-bottom: 12px; }
+  .lock-box h2 { font-size: 20px; margin-bottom: 6px; }
+  .lock-hint { color: #666; font-size: 14px; margin-bottom: 18px; }
+  .lock-box label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 5px; text-align: left; }
+  .lock-box input[type=password], .lock-box input[type=text] { width: 100%; padding: 11px 12px; font-size: 15px; border: 1px solid #e5e5e5; border-radius: 10px; outline: none; text-align: center; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .lock-box input[type=password]:focus, .lock-box input[type=text]:focus { border-color: #d32d27; }
+  #vaultScreen { position: fixed; inset: 0; background: #fff; z-index: 50; display: none; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 48px 20px; }
+  #vaultScreen.open { display: flex; }
+  .beta-tag { display: inline-block; background: #D32D27; color: #fff; font-size: 11px; font-weight: 800; letter-spacing: 1px; padding: 2px 7px; border-radius: 4px; vertical-align: middle; margin-left: 6px; }
+  .lock-note { color: #999; font-size: 12px; line-height: 1.6; margin-top: 20px; }
+  #lockScreen .btn { margin-top: 12px; }
+  .sheet input.mono { font-family: ui-monospace, Menlo, Consolas, monospace; text-transform: uppercase; }
+  .btn {
+    width: 100%; padding: 13px; margin-top: 18px; border: none; border-radius: 12px;
+    background: #d32d27; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
+  }
+  .btn:active { background: #b71c1c; }
+  .btn.ghost { background: #f3f3f3; color: #111; margin-top: 10px; }
+  .btn.ghost:active { background: #e9e9e9; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 6px; }
+  .tabs button {
+    flex: 1; padding: 10px; border: 1px solid #e5e5e5; border-radius: 10px; background: #fff;
+    font-size: 14px; font-weight: 600; cursor: pointer; color: #111;
+  }
+  .tabs button.active { background: #d32d27; border-color: #d32d27; color: #fff; }
+  #scanBox { display: none; }
+  #scanBox .scan-msg { font-size: 13px; color: #666; margin-top: 8px; text-align: center; }
+  .err { color: #c00; font-size: 13px; margin-top: 10px; display: none; }
+  .menu { display: none; position: absolute; top: 64px; right: 20px; background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.12); z-index: 5; overflow: hidden; }
+  .menu.open { display: block; }
+  .menu button { display: block; width: 100%; text-align: left; padding: 12px 16px; background: #fff; border: none; font-size: 14px; cursor: pointer; color: #111; }
+  .menu button:active { background: #f3f3f3; }
+  @media (max-width: 480px) {
+    .wrap { padding: 20px 16px 12px; }
+    .card .code { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="igGrad" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#feda75"/><stop offset=".45" stop-color="#d62976"/><stop offset="1" stop-color="#4f5bd5"/></linearGradient></defs></svg>
+<div class="wrap">
+  <header>
+    <img src="../icons/icon-192.png" alt="Authr logo">
+    <h1>AUTHR <span class="beta-tag">BETA</span></h1>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="menuBtn" title="Backup &amp; restore" aria-label="Menu">&#8942;</button>
+  </header>
+  <div class="menu" id="menu">
+    <button id="exportBtn">Export backup (JSON)</button>
+    <button id="importBtn">Import backup</button>
+    <button id="lockBtn">App lock: Off</button>
+    <button id="aboutBtn">About</button>
+    <input type="file" id="importFile" accept=".json,application/json" hidden>
+  </div>
+  <p class="sub">Your 2FA codes. Everything stays on this device.</p>
+  <input type="text" id="search" placeholder="Search accounts" autocomplete="off">
+  <div id="list"></div>
+  <div class="empty" id="empty" style="display:none">
+    <b>No accounts yet.</b><br>Tap <b>+</b> to add your first account —<br>paste its secret key or scan its QR code.
+  </div>
+  <footer>Codes are generated on this device only.<br>Secrets never leave your browser — export a backup.</footer>
+</div>
+
+<button class="fab" id="addBtn" title="Add account" aria-label="Add account">+</button>
+
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <h2>Add account</h2>
+    <p class="hint">Enter the details from the site or app giving you the 2FA code. The secret key is the long code shown next to its QR code.</p>
+    <div class="tabs">
+      <button id="tabManual" class="active">Enter key</button>
+      <button id="tabScan">Upload QR</button>
+    </div>
+    <div id="manualBox">
+      <label for="fIssuer">Service (e.g. GitHub)</label>
+      <input type="text" id="fIssuer" placeholder="GitHub" autocomplete="off">
+      <label for="fName">Account name (e.g. your username)</label>
+      <input type="text" id="fName" placeholder="Account name" autocomplete="off">
+      <label for="fSecret">Secret key</label>
+      <input type="text" id="fSecret" class="mono" placeholder="JBSW Y3DP EHPK 3PXP" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <div class="err" id="formErr"></div>
+      <button class="btn" id="saveBtn">Add account</button>
+    </div>
+    <div id="scanBox">
+      <canvas id="canvas" hidden></canvas>
+      <p class="scan-msg" id="scanMsg">Pick a QR code image from your gallery.</p>
+      <button class="btn ghost" id="uploadBtn" type="button">Upload from gallery</button>
+      <input type="file" id="galleryFile" accept="image/*" hidden>
+      <div class="err" id="scanErr"></div>
+    </div>
+    <button class="btn ghost" id="cancelBtn">Cancel</button>
+  </div>
+</div>
+
+<div class="overlay" id="editOverlay">
+  <div class="sheet">
+    <h2>Edit account</h2>
+    <p class="hint">Change how this account appears in your list. The secret key stays the same.</p>
+    <label for="editIssuer">Service (e.g. GitHub)</label>
+    <input type="text" id="editIssuer" placeholder="GitHub" autocomplete="off">
+    <label for="editName">Account name (e.g. your username)</label>
+    <input type="text" id="editName" placeholder="Account name" autocomplete="off">
+    <div class="err" id="editErr"></div>
+    <button class="btn" id="editSaveBtn">Save changes</button>
+    <button class="btn ghost" id="editCancelBtn">Cancel</button>
+  </div>
+</div>
+
+<div class="overlay" id="aboutOverlay">
+  <div class="sheet">
+    <h2>About Authr</h2>
+    <p class="body">Authr is a private two-factor authenticator. It generates 6-digit codes on this device for your accounts.</p>
+    <p class="body">Your secrets never leave this browser. Codes are generated on-device and nothing is sent to any server.</p>
+    <p class="body">If you clear this site's data, your accounts are gone. Export a backup from the menu first.</p>
+    <p class="body">Developed by <a href="https://saurabh.qzz.io" target="_blank" rel="noopener">sauravhhh</a></p>
+    <button class="btn" id="aboutCloseBtn">Close</button>
+  </div>
+</div>
+
+<div class="overlay" id="lockOverlay">
+  <div class="sheet">
+    <h2>App lock</h2>
+    <p class="hint" id="lockStatus">App lock is off. Turn it on to hide your codes behind fingerprint or a passcode.</p>
+    <p class="warn">If you forget your passcode, your fingerprint gets you back in. If no fingerprint is enrolled, the only way back in is clearing this site's data — which deletes all your accounts. Export a backup first.</p>
+    <p class="warn" id="recoveryBanner" style="display:none">You unlocked with your device. Set a new passcode below, or turn off App lock.</p>
+    <button class="btn" id="fpSetupBtn">Use fingerprint</button>
+    <p class="or">or set a passcode</p>
+    <label for="fPass">Passcode (4+ digits)</label>
+    <input type="password" id="fPass" inputmode="numeric" autocomplete="off" placeholder="4+ digits">
+    <label for="fPass2">Confirm passcode</label>
+    <input type="password" id="fPass2" inputmode="numeric" autocomplete="off" placeholder="Repeat passcode">
+    <div class="err" id="lockErr"></div>
+    <button class="btn" id="passSetupBtn">Set passcode</button>
+    <button class="btn ghost" id="lockOffBtn" style="display:none">Turn off App lock</button>
+    <button class="btn ghost" id="lockCancelBtn">Close</button>
+  </div>
+</div>
+
+<div id="vaultScreen">
+  <div class="lock-box">
+    <img src="../icons/icon-192.png" alt="Authr logo" class="lock-logo">
+    <h2 id="vaultTitle">Authr Beta</h2>
+    <p class="lock-hint" id="vaultHint">Set a passcode to create your encrypted vault.</p>
+    <div id="vaultSetup">
+      <label for="fVaultPass1">Passcode (4+ digits)</label>
+      <input type="password" id="fVaultPass1" inputmode="numeric" autocomplete="off" placeholder="Choose a passcode">
+      <label for="fVaultPass2">Confirm passcode</label>
+      <input type="password" id="fVaultPass2" inputmode="numeric" autocomplete="off" placeholder="Repeat the passcode">
+      <div class="err" id="vaultSetupErr"></div>
+      <button class="btn" id="vaultCreateBtn">Create vault</button>
+      <p class="lock-note">Your passcode encrypts every secret on this device. If you forget it, there is no recovery — your accounts are gone for good. Write it down somewhere safe.</p>
+    </div>
+    <div id="vaultUnlock" style="display:none">
+      <label for="fVaultPass">Passcode</label>
+      <input type="password" id="fVaultPass" inputmode="numeric" autocomplete="off" placeholder="Enter passcode">
+      <div class="err" id="vaultUnlockErr"></div>
+      <button class="btn" id="vaultUnlockBtn">Unlock vault</button>
+      <p class="lock-note">Forgot your passcode? There is no recovery. Clearing this site's data deletes the encrypted vault and all accounts.</p>
+    </div>
+  </div>
+</div>
+
+<div id="lockScreen">
+  <div class="lock-box">
+    <img src="../icons/icon-192.png" alt="Authr logo" class="lock-logo">
+    <h2>Authr is locked</h2>
+    <p class="lock-hint">Unlock to see your 2FA codes.</p>
+    <button class="btn" id="fpUnlockBtn" style="display:none">Unlock with fingerprint</button>
+    <div id="passUnlock" style="display:none">
+      <label for="fUnlockPass">Passcode</label>
+      <input type="password" id="fUnlockPass" inputmode="numeric" autocomplete="off" placeholder="Enter passcode">
+      <div class="err" id="unlockErr"></div>
+      <button class="btn" id="passUnlockBtn">Unlock</button>
+      <button class="link-btn" id="deviceUnlockLink" style="display:none">Use device unlock instead</button>
+    </div>
+    <p class="lock-note">Forgot your passcode? Your fingerprint gets you back in — or, in the app, your device unlock (fingerprint, PIN or pattern). If no fingerprint is enrolled, clearing this site's data is the only way back in, and it deletes all accounts.</p>
+  </div>
+</div>
+
+<script src="jsQR.js"></script>
+<script>
+(function () {
+  "use strict";
+  var LS_KEY = "authr.beta.vault.v1";
+
+  /* ---------- base32 ---------- */
+  var B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  function base32Decode(str) {
+    var clean = str.replace(/[\s\-=]/g, "").toUpperCase();
+    if (!/^[A-Z2-7]*$/.test(clean) || clean.length === 0) throw new Error("bad secret");
+    var bits = "", out = [];
+    for (var i = 0; i < clean.length; i++) {
+      var v = B32.indexOf(clean[i]);
+      if (v < 0) throw new Error("bad secret");
+      bits += ("00000" + v.toString(2)).slice(-5);
+    }
+    for (var j = 0; j + 8 <= bits.length; j += 8) out.push(parseInt(bits.slice(j, j + 8), 2));
+    return new Uint8Array(out);
+  }
+
+  /* ---------- TOTP (RFC 6238, SHA-1 default) ---------- */
+  function hotp(keyBytes, counter, digits, algo) {
+    var buf = new ArrayBuffer(8), view = new DataView(buf);
+    view.setUint32(0, Math.floor(counter / 4294967296));
+    view.setUint32(4, counter >>> 0);
+    return crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: { name: algo || "SHA-1" } }, false, ["sign"])
+      .then(function (key) { return crypto.subtle.sign("HMAC", key, buf); })
+      .then(function (sig) {
+        var h = new Uint8Array(sig);
+        var o = h[h.length - 1] & 0x0f;
+        var code = ((h[o] & 0x7f) << 24) | ((h[o + 1] & 0xff) << 16) | ((h[o + 2] & 0xff) << 8) | (h[o + 3] & 0xff);
+        var s = String(code % Math.pow(10, digits || 6));
+        while (s.length < (digits || 6)) s = "0" + s;
+        return s;
+      });
+  }
+  function totp(secret, whenMs, digits, period, algo) {
+    var key = base32Decode(secret);
+    var counter = Math.floor((whenMs || Date.now()) / 1000 / (period || 30));
+    return hotp(key, counter, digits || 6, algo || "SHA-1");
+  }
+  // exposed for testing: totp(secret, ms) -> Promise<string>
+  window.__totpForTest = totp;
+
+  /* ---------- vault (Swiss-bank grade, client-side only) ---------- */
+  // AES-256-GCM + PBKDF2 (600k iters, SHA-256). Key lives only in memory.
+  var VAULT_FAIL_KEY = "authr.beta.fail.v1";
+  var vaultKey = null;        // CryptoKey, in-memory only
+  var vaultUnlocked = false;
+  var failState = { count: 0, lockoutUntil: 0 };
+  try { var _fs = JSON.parse(localStorage.getItem(VAULT_FAIL_KEY) || "null"); if (_fs && typeof _fs.count === "number") failState = _fs; } catch (e) {}
+  function saveFailState() { try { localStorage.setItem(VAULT_FAIL_KEY, JSON.stringify(failState)); } catch (e) {} }
+  function b64encode(buf) {
+    var bytes = new Uint8Array(buf), s = "";
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s);
+  }
+  function b64decode(str) {
+    var s = atob(str), out = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return out.buffer;
+  }
+  function deriveKey(passcode, saltBuf) {
+    return crypto.subtle.importKey("raw", new TextEncoder().encode(passcode), "PBKDF2", false, ["deriveKey"])
+      .then(function (base) {
+        return crypto.subtle.deriveKey(
+          { name: "PBKDF2", salt: saltBuf, iterations: 600000, hash: "SHA-256" },
+          base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+      });
+  }
+  function vaultBlob() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || "null"); } catch (e) { return null; }
+  }
+  function encryptAndStore() {
+    if (!vaultKey) return Promise.resolve();
+    var iv = crypto.getRandomValues(new Uint8Array(12));
+    var data = new TextEncoder().encode(JSON.stringify(accounts));
+    return crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, vaultKey, data)
+      .then(function (ct) {
+        var blob = vaultBlob() || {};
+        blob.iv = b64encode(iv);
+        blob.data = b64encode(ct);
+        localStorage.setItem(LS_KEY, JSON.stringify(blob));
+      });
+  }
+  function createVault(passcode) {
+    var salt = crypto.getRandomValues(new Uint8Array(16));
+    return deriveKey(passcode, salt).then(function (key) {
+      vaultKey = key;
+      var blob = { salt: b64encode(salt), iv: "", data: "" };
+      localStorage.setItem(LS_KEY, JSON.stringify(blob));
+      return encryptAndStore();
+    });
+  }
+  function unlockVault(passcode) {
+    var blob = vaultBlob();
+    if (!blob || !blob.salt) return Promise.resolve(false);
+    return deriveKey(passcode, b64decode(blob.salt)).then(function (key) {
+      if (!blob.data) { vaultKey = key; return true; }
+      return crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(b64decode(blob.iv)) }, key, b64decode(blob.data))
+        .then(function (pt) {
+          vaultKey = key;
+          try { accounts = JSON.parse(new TextDecoder().decode(pt)); } catch (e) { accounts = []; }
+          return true;
+        })
+        .catch(function () { return false; });
+    });
+  }
+  function lockVault() {
+    vaultKey = null;
+    vaultUnlocked = false;
+    accounts = [];
+    codes = {};
+    showVaultScreen();
+    render();
+  }
+  function noteFail() {
+    failState.count += 1;
+    if (failState.count >= 5) failState.lockoutUntil = Date.now() + 30000;
+    if (failState.count >= 10) failState.lockoutUntil = Date.now() + 300000;
+    saveFailState();
+  }
+  function clearFails() { failState = { count: 0, lockoutUntil: 0 }; saveFailState(); }
+
+  /* ---------- storage (vault-backed) ---------- */
+  function load() { return accounts; }
+  function save(list) { accounts = list; encryptAndStore(); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  /* ---------- state ---------- */
+  var accounts = [];  // populated only after the vault is unlocked
+  var LOCK_KEY = "authr.beta.lock.v1";  // unused in beta; vault is the only gate
+  var lockCfg = null;
+  var locked = false;
+  var codes = {};      // id -> current code string
+  var copiedId = null, copiedAt = 0;
+  var openMenuId = null;  // id of the account whose kebab menu is open (survives re-render)
+  var editingId = null;   // id of the account being edited
+
+  var listEl = document.getElementById("list");
+  var emptyEl = document.getElementById("empty");
+  var searchEl = document.getElementById("search");
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  /* ---------- service thumbnails ---------- */
+  function letterMark(bg, text, size, fg) {
+    return '<rect width="40" height="40" rx="10" fill="' + bg + '"/>'
+      + '<text x="20" y="27" text-anchor="middle" font-size="' + (size || 22) + '" font-weight="800" fill="' + (fg || "#fff") + '" font-family="Arial, Helvetica, sans-serif">' + text + '</text>';
+  }
+  var BRANDS = {
+    facebook: '<rect width="40" height="40" rx="10" fill="#1877F2"/>'
+      + '<g transform="translate(8,8)" fill="#fff"><path d="M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z"/></g>',
+    instagram: '<rect width="40" height="40" rx="10" fill="url(#igGrad)"/>'
+      + '<g transform="translate(8,8)" fill="#fff"><path d="M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077"/></g>',
+    x: '<rect width="40" height="40" rx="10" fill="#000"/>'
+      + '<g transform="translate(8,8)" fill="#fff"><path d="M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z"/></g>',
+    pinterest: '<rect width="40" height="40" rx="10" fill="#E60023"/>'
+      + '<g transform="translate(8,8)" fill="#fff"><path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.663.967-2.911 2.168-2.911 1.024 0 1.518.769 1.518 1.688 0 1.029-.653 2.567-.992 3.992-.285 1.193.6 2.165 1.775 2.165 2.128 0 3.768-2.245 3.768-5.487 0-2.861-2.063-4.869-5.008-4.869-3.41 0-5.409 2.562-5.409 5.199 0 1.033.394 2.143.889 2.741.099.12.112.225.085.345-.09.375-.293 1.199-.334 1.363-.053.225-.172.271-.401.165-1.495-.69-2.433-2.878-2.433-4.646 0-3.776 2.748-7.252 7.92-7.252 4.158 0 7.392 2.967 7.392 6.923 0 4.135-2.607 7.462-6.233 7.462-1.214 0-2.354-.629-2.758-1.379l-.749 2.848c-.269 1.045-1.004 2.352-1.498 3.146 1.123.345 2.306.535 3.55.535 6.607 0 11.985-5.365 11.985-11.987C23.97 5.39 18.592.026 11.985.026L12.017 0z"/></g>',
+    gmail: letterMark("#EA4335", "G", 22),
+    outlook: letterMark("#0078D4", "O"),
+    yahoo: letterMark("#6001D2", "Y!", 18),
+    google: letterMark("#4285F4", "G"),
+    github: letterMark("#181717", "GH", 13),
+    whatsapp: '<rect width="40" height="40" rx="10" fill="#25D366"/>'
+      + '<g transform="translate(8,8)" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></g>',
+    telegram: '<rect width="40" height="40" rx="10" fill="#229ED9"/>'
+      + '<g transform="translate(8,8)" fill="#fff"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></g>',
+    linkedin: letterMark("#0A66C2", "in", 19),
+    snapchat: '<rect width="40" height="40" rx="10" fill="#FFFC00"/>'
+      + '<g transform="translate(8,8)" fill="#fff" stroke="#000" stroke-width="1.5" stroke-linejoin="round"><path d="M12.206.793c.99 0 4.347.276 5.93 3.821.529 1.193.403 3.219.299 4.847l-.003.06c-.012.18-.022.345-.03.51.075.045.203.09.401.09.3-.016.659-.12 1.033-.301.165-.088.344-.104.464-.104.182 0 .359.029.509.09.45.149.734.479.734.838.015.449-.39.839-1.213 1.168-.089.029-.209.075-.344.119-.45.135-1.139.36-1.333.81-.09.224-.061.524.12.868l.015.015c.06.136 1.526 3.475 4.791 4.014.255.044.435.27.42.509 0 .075-.015.149-.045.225-.24.569-1.273.988-3.146 1.271-.059.091-.12.375-.164.57-.029.179-.074.36-.134.553-.076.271-.27.405-.555.405h-.03c-.135 0-.313-.031-.538-.074-.36-.075-.765-.135-1.273-.135-.3 0-.599.015-.913.074-.6.104-1.123.464-1.723.884-.853.599-1.826 1.288-3.294 1.288-.06 0-.119-.015-.18-.015h-.149c-1.468 0-2.427-.675-3.279-1.288-.599-.42-1.107-.779-1.707-.884-.314-.045-.629-.074-.928-.074-.54 0-.958.089-1.272.149-.211.043-.391.074-.54.074-.374 0-.523-.224-.583-.42-.061-.192-.09-.389-.135-.567-.046-.181-.105-.494-.166-.57-1.918-.222-2.95-.642-3.189-1.226-.031-.063-.052-.15-.055-.225-.015-.243.165-.465.42-.509 3.264-.54 4.73-3.879 4.791-4.02l.016-.029c.18-.345.224-.645.119-.869-.195-.434-.884-.658-1.332-.809-.121-.029-.24-.074-.346-.119-1.107-.435-1.257-.93-1.197-1.273.09-.479.674-.793 1.168-.793.146 0 .27.029.383.074.42.194.789.3 1.104.3.234 0 .384-.06.465-.105l-.046-.569c-.098-1.626-.225-3.651.307-4.837C7.392 1.077 10.739.807 11.727.807l.419-.015h.06z"/></g>',
+    discord: '<rect width="40" height="40" rx="10" fill="#5865F2"/>'
+      + '<g transform="translate(8,8)" fill="#fff"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></g>',
+    amazon: letterMark("#FF9900", "a"),
+    netflix: letterMark("#E50914", "N"),
+    spotify: letterMark("#1DB954", "S", 22),
+    microsoft: letterMark("#00A4EF", "M", 22),
+    apple: letterMark("#000", "A", 22),
+    reddit: '<rect width="40" height="40" rx="10" fill="#FF4500"/>'
+      + '<g transform="translate(8,8)" fill="#fff"><path d="M12 0C5.373 0 0 5.373 0 12c0 3.314 1.343 6.314 3.515 8.485l-2.286 2.286C.775 23.225 1.097 24 1.738 24H12c6.627 0 12-5.373 12-12S18.627 0 12 0Zm4.388 3.199c1.104 0 1.999.895 1.999 1.999 0 1.105-.895 2-1.999 2-.946 0-1.739-.657-1.947-1.539v.002c-1.147.162-2.032 1.15-2.032 2.341v.007c1.776.067 3.4.567 4.686 1.363.473-.363 1.064-.58 1.707-.58 1.547 0 2.802 1.254 2.802 2.802 0 1.117-.655 2.081-1.601 2.531-.088 3.256-3.637 5.876-7.997 5.876-4.361 0-7.905-2.617-7.998-5.87-.954-.447-1.614-1.415-1.614-2.538 0-1.548 1.255-2.802 2.803-2.802.645 0 1.239.218 1.712.585 1.275-.79 2.881-1.291 4.64-1.365v-.01c0-1.663 1.263-3.034 2.88-3.207.188-.911.993-1.595 1.959-1.595Zm-8.085 8.376c-.784 0-1.459.78-1.506 1.797-.047 1.016.64 1.429 1.426 1.429.786 0 1.371-.369 1.418-1.385.047-1.017-.553-1.841-1.338-1.841Zm7.406 0c-.786 0-1.385.824-1.338 1.841.047 1.017.634 1.385 1.418 1.385.785 0 1.473-.413 1.426-1.429-.046-1.017-.721-1.797-1.506-1.797Zm-3.703 4.013c-.974 0-1.907.048-2.77.135-.147.015-.241.168-.183.305.483 1.154 1.622 1.964 2.953 1.964 1.33 0 2.47-.81 2.953-1.964.057-.137-.037-.29-.184-.305-.863-.087-1.795-.135-2.769-.135Z"/></g>',
+    steam: letterMark("#1b2838", "S"),
+    slack: letterMark("#4A154B", "#"),
+    zoom: letterMark("#2D8CFF", "Z"),
+    dropbox: letterMark("#0061FF", "D", 22),
+    paypal: letterMark("#003087", "P"),
+    phonepe: letterMark("#5f259f", "Pe", 16),
+    paytm: letterMark("#00B9F1", "P"),
+    binance: letterMark("#F0B90B", "B", 22),
+    coinbase: letterMark("#0052FF", "C"),
+    tiktok: '<rect width="40" height="40" rx="10" fill="#000000"/>'
+      + '<g transform="translate(8,8)" fill="#fff"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></g>',
+    youtube: '<rect width="40" height="40" rx="10" fill="#FF0000"/>'
+      + '<g transform="translate(8,8)" fill="#fff"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></g>',
+    threads: '<rect width="40" height="40" rx="10" fill="#000000"/>'
+      + '<g transform="translate(8,8)" fill="#fff"><path d="M18.263 11.097c-.03-3.486-1.92-5.586-5.111-5.586-2.13 0-3.922.963-4.863 2.499l2.062 1.438c.535-.843 1.272-1.543 2.628-1.543 1.528 0 2.318.85 2.544 2.431a15 15 0 0 0-2.236-.173c-4.125 0-6.068 1.867-6.068 4.336s1.943 3.99 4.804 3.99c3.139 0 5.013-2.115 5.781-4.735.798.361 1.348 1.204 1.348 2.47 0 3.387-3.907 5.232-7.22 5.232-4.885 0-8.077-3.207-8.077-8.424 0-6.392 4.223-10.487 9.9-10.487 3.808 0 5.69 1.671 6.97 3.914l2.108-1.475C21.44 2.078 18.331 0 13.663 0 6.227 0 1.168 5.277 1.168 12.934c0 7 4.953 11.066 10.856 11.066 4.878 0 9.809-2.846 9.809-7.716 0-2.545-1.46-4.231-3.569-5.187m-6.33 4.855c-1.077 0-2.026-.512-2.026-1.453 0-1.483 1.822-1.934 3.606-1.934.678 0 1.34.045 1.927.173-.422 1.927-1.671 3.215-3.508 3.214Z"/></g>',
+    signal: '<rect width="40" height="40" rx="10" fill="#3A76F0"/>'
+      + '<g transform="translate(8,8)" fill="#fff"><path d="M12 0q-.934 0-1.83.139l.17 1.111a11 11 0 0 1 3.32 0l.172-1.111A12 12 0 0 0 12 0M9.152.34A12 12 0 0 0 5.77 1.742l.584.961a10.8 10.8 0 0 1 3.066-1.27zm5.696 0-.268 1.094a10.8 10.8 0 0 1 3.066 1.27l.584-.962A12 12 0 0 0 14.848.34M12 2.25a9.75 9.75 0 0 0-8.539 14.459c.074.134.1.292.064.441l-1.013 4.338 4.338-1.013a.62.62 0 0 1 .441.064A9.7 9.7 0 0 0 12 21.75c5.385 0 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25m-7.092.068a12 12 0 0 0-2.59 2.59l.909.664a11 11 0 0 1 2.345-2.345zm14.184 0-.664.909a11 11 0 0 1 2.345 2.345l.909-.664a12 12 0 0 0-2.59-2.59M1.742 5.77A12 12 0 0 0 .34 9.152l1.094.268a10.8 10.8 0 0 1 1.269-3.066zm20.516 0-.961.584a10.8 10.8 0 0 1 1.27 3.066l1.093-.268a12 12 0 0 0-1.402-3.383M.138 10.168A12 12 0 0 0 0 12q0 .934.139 1.83l1.111-.17A11 11 0 0 1 1.125 12q0-.848.125-1.66zm23.723.002-1.111.17q.125.812.125 1.66c0 .848-.042 1.12-.125 1.66l1.111.172a12.1 12.1 0 0 0 0-3.662M1.434 14.58l-1.094.268a12 12 0 0 0 .96 2.591l-.265 1.14 1.096.255.36-1.539-.188-.365a10.8 10.8 0 0 1-.87-2.35m21.133 0a10.8 10.8 0 0 1-1.27 3.067l.962.584a12 12 0 0 0 1.402-3.383zm-1.793 3.848a11 11 0 0 1-2.345 2.345l.664.909a12 12 0 0 0 2.59-2.59zm-19.959 1.1L.357 21.48a1.8 1.8 0 0 0 2.162 2.161l1.954-.455-.256-1.095-1.953.455a.675.675 0 0 1-.81-.81l.454-1.954zm16.832 1.769a10.8 10.8 0 0 1-3.066 1.27l.268 1.093a12 12 0 0 0 3.382-1.402zm-10.94.213-1.54.36.256 1.095 1.139-.266c.814.415 1.683.74 2.591.961l.268-1.094a10.8 10.8 0 0 1-2.35-.869zm3.634 1.24-.172 1.111a12.1 12.1 0 0 0 3.662 0l-.17-1.111q-.812.125-1.66.125a11 11 0 0 1-1.66-.125"/></g>',
+    tumblr: '<rect width="40" height="40" rx="10" fill="#36465D"/>'
+      + '<g transform="translate(8,8)" fill="#fff"><path d="M14.563 24c-5.093 0-7.031-3.756-7.031-6.411V9.747H5.116V6.648c3.63-1.313 4.512-4.596 4.71-6.469C9.84.051 9.941 0 9.999 0h3.517v6.114h4.801v3.633h-4.82v7.47c.016 1.001.375 2.371 2.207 2.371h.09c.631-.02 1.486-.205 1.936-.419l1.156 3.425c-.436.636-2.4 1.374-4.156 1.404h-.178l.011.002z"/></g>',
+    twitch: '<rect width="40" height="40" rx="10" fill="#9146FF"/>'
+      + '<g transform="translate(8,8)" fill="#fff"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></g>',
+  };
+  var BRAND_ALIASES = {
+    facebook: ["facebook", "fb", "meta"],
+    instagram: ["instagram", "insta", "ig"],
+    x: ["twitter", "x"],
+    pinterest: ["pinterest"],
+    gmail: ["gmail", "googlemail"],
+    google: ["google"],
+    outlook: ["outlook", "hotmail", "live", "msn", "microsoft365", "office365"],
+    yahoo: ["yahoo", "ymail"],
+    github: ["github"],
+    whatsapp: ["whatsapp", "wa"],
+    telegram: ["telegram", "tg"],
+    linkedin: ["linkedin"],
+    snapchat: ["snapchat"],
+    discord: ["discord"],
+    amazon: ["amazon"],
+    netflix: ["netflix"],
+    spotify: ["spotify"],
+    microsoft: ["microsoft", "ms"],
+    apple: ["apple", "appleid"],
+    reddit: ["reddit"],
+    steam: ["steam"],
+    slack: ["slack"],
+    zoom: ["zoom"],
+    dropbox: ["dropbox"],
+    paypal: ["paypal"],
+    phonepe: ["phonepe"],
+    paytm: ["paytm"],
+    binance: ["binance"],
+    coinbase: ["coinbase"],
+    tiktok: ["tiktok"],
+    youtube: ["youtube", "yt"],
+    threads: ["threads"],
+    signal: ["signal"],
+    tumblr: ["tumblr"],
+    twitch: ["twitch"],
+  };
+  var FALLBACK_COLORS = ["#4f46e5", "#0e7490", "#b45309", "#be185d", "#15803d", "#6d28d9", "#b91c1c", "#334155"];
+  function thumbFor(acct) {
+    var label = (acct.issuer && acct.issuer !== "Account") ? acct.issuer : (acct.name || "");
+    var key = String(label).toLowerCase().replace(/[^a-z0-9]/g, "");
+    var brand = null;
+    if (key) {
+      var names = Object.keys(BRAND_ALIASES);
+      for (var i = 0; i < names.length; i++) {
+        if (BRAND_ALIASES[names[i]].indexOf(key) !== -1) { brand = names[i]; break; }
+      }
+      if (!brand && key.length >= 3) {
+        for (var j = 0; j < names.length; j++) {
+          if (names[j].length > 1 && (key.indexOf(names[j]) !== -1 || names[j].indexOf(key) !== -1)) { brand = names[j]; break; }
+        }
+      }
+    }
+    if (brand) return '<svg width="40" height="40" viewBox="0 0 40 40">' + BRANDS[brand] + "</svg>";
+    var words = String(label || "?").trim().split(/\s+/);
+    var letters = words.length > 1 ? (words[0][0] + words[1][0]).toUpperCase() : String(label || "?").slice(0, 2).toUpperCase();
+    var h = 0;
+    for (var k = 0; k < key.length; k++) h = (h * 31 + key.charCodeAt(k)) >>> 0;
+    return '<svg width="40" height="40" viewBox="0 0 40 40">' + letterMark(FALLBACK_COLORS[h % FALLBACK_COLORS.length], esc(letters), letters.length > 1 ? 15 : 20) + "</svg>";
+  }
+  function fmt(code) {
+    if (!code) return "------";
+    var c = String(code);
+    if (/^\d{6}$/.test(c)) return c.slice(0, 3) + " " + c.slice(3);
+    return c;
+  }
+  var COPY_SVG = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
+  function render() {
+    if (locked) return;
+    var q = (searchEl.value || "").trim().toLowerCase();
+    var shown = accounts.filter(function (a) {
+      return !q || (a.issuer + " " + a.name).toLowerCase().indexOf(q) !== -1;
+    });
+    emptyEl.style.display = accounts.length === 0 ? "block" : "none";
+    if (accounts.length === 0) { listEl.innerHTML = ""; return; }
+    if (shown.length === 0) { listEl.innerHTML = '<div class="empty">No accounts match that search.</div>'; return; }
+    var now = Date.now();
+    var period = 30;
+    var remain = period - (Math.floor(now / 1000) % period);
+    var frac = remain / period;
+    var html = "";
+    shown.forEach(function (a) {
+      var code = codes[a.id] || "";
+      var copied = copiedId === a.id && (now - copiedAt) < 2000;
+      html += '<div class="card" data-id="' + esc(a.id) + '">'
+        + '<div class="card-top">'
+        + '<div class="thumb">' + thumbFor(a) + '</div>'
+        + '<div class="issuer">' + esc(a.issuer || "Account") + '</div>'
+        + '<button class="kebab" data-kebab="' + esc(a.id) + '" title="Options">&#8942;</button>'
+        + '</div>'
+        + '<div class="card-mid">'
+        + '<div class="code">' + fmt(code) + '</div>'
+        + '<button class="copy" data-copy="' + esc(a.id) + '" title="Copy code">' + COPY_SVG + '</button>'
+        + (copied ? '<span class="copied">Copied</span>' : "")
+        + '<svg class="ring" viewBox="0 0 40 40"><circle class="bg" cx="20" cy="20" r="16"/>'
+        + '<circle class="fg" cx="20" cy="20" r="16" stroke-dasharray="' + (100.53 * frac).toFixed(1) + ' 100.53"/>'
+        + '<text x="20" y="24" text-anchor="middle">' + remain + '</text></svg>'
+        + '</div>'
+        + '<div class="card-bottom"><div class="name">' + esc(a.name || "") + '</div></div>'
+        + '<div class="kebab-menu' + (openMenuId === a.id ? " open" : "") + '"><button data-edit="' + esc(a.id) + '">Edit</button><button data-del="' + esc(a.id) + '">Delete</button></div>'
+        + '</div>';
+    });
+    listEl.innerHTML = html;
+  }
+
+  function refreshCodes() {
+    if (locked) return;
+    var now = Date.now();
+    var jobs = accounts.map(function (a) {
+      return totp(a.secret, now, a.digits, a.period, a.algo).then(function (c) { codes[a.id] = c; })
+        .catch(function () { codes[a.id] = ""; });
+    });
+    Promise.all(jobs).then(render);
+  }
+
+  /* ---------- add / delete ---------- */
+  function parseOtpAuth(url) {
+    var u = url.trim();
+    if (u.slice(0, 10).toLowerCase() !== "otpauth://") return null;
+    var rest = u.slice(10);
+    var qi = rest.indexOf("?");
+    var label = decodeURIComponent((qi >= 0 ? rest.slice(0, qi) : rest).replace(/^totp\//i, ""));
+    var params = {};
+    if (qi >= 0) rest.slice(qi + 1).split("&").forEach(function (pair) {
+      var kv = pair.split("=");
+      if (kv[0]) params[decodeURIComponent(kv[0]).toLowerCase()] = decodeURIComponent(kv[1] || "");
+    });
+    if (!params.secret) return null;
+    var issuer = params.issuer || "", name = label;
+    if (label.indexOf(":") !== -1) {
+      var parts = label.split(":");
+      if (!issuer) issuer = parts[0];
+      name = parts.slice(1).join(":").trim();
+    }
+    return {
+      issuer: issuer, name: name, secret: params.secret,
+      digits: parseInt(params.digits, 10) || 6,
+      period: parseInt(params.period, 10) || 30,
+      algo: (params.algorithm || "SHA1").toUpperCase().replace("-", "")
+    };
+  }
+
+  function normAlgo(a) {
+    var s = String(a || "SHA-1").toUpperCase().replace(/-/g, "");
+    if (s === "SHA1") return "SHA-1";
+    if (s === "SHA256") return "SHA-256";
+    if (s === "SHA512") return "SHA-512";
+    return "SHA-1";
+  }
+
+  function addAccount(acct) {
+    if (!acct.secret) return "Missing secret key.";
+    try { base32Decode(acct.secret); } catch (e) { return "That secret key doesn't look right — check it and try again."; }
+    if (accounts.some(function (a) { return a.issuer === acct.issuer && a.name === acct.name && a.secret === acct.secret; }))
+      return "That account is already added.";
+    accounts.push({
+      id: uid(), issuer: acct.issuer || "Account", name: acct.name || "",
+      secret: acct.secret.replace(/[\s\-]/g, "").toUpperCase(),
+      digits: acct.digits || 6, period: acct.period || 30, algo: normAlgo(acct.algo)
+    });
+    save(accounts);
+    refreshCodes();
+    return null;
+  }
+
+  /* ---------- sheet ---------- */
+  var overlay = document.getElementById("overlay");
+  function openSheet() {
+    overlay.classList.add("open");
+    document.getElementById("formErr").style.display = "none";
+    document.getElementById("scanErr").style.display = "none";
+    showTab("manual");
+  }
+  function closeSheet() { overlay.classList.remove("open"); }
+  function showTab(which) {
+    document.getElementById("tabManual").classList.toggle("active", which === "manual");
+    document.getElementById("tabScan").classList.toggle("active", which === "scan");
+    document.getElementById("manualBox").style.display = which === "manual" ? "block" : "none";
+    document.getElementById("scanBox").style.display = which === "scan" ? "block" : "none";
+  }
+
+  document.getElementById("addBtn").addEventListener("click", openSheet);
+  document.getElementById("cancelBtn").addEventListener("click", closeSheet);
+  overlay.addEventListener("click", function (e) { if (e.target === overlay) closeSheet(); });
+  document.getElementById("tabManual").addEventListener("click", function () { showTab("manual"); });
+  document.getElementById("tabScan").addEventListener("click", function () { showTab("scan"); });
+
+  document.getElementById("saveBtn").addEventListener("click", function () {
+    var errEl = document.getElementById("formErr");
+    var err = addAccount({
+      issuer: document.getElementById("fIssuer").value.trim(),
+      name: document.getElementById("fName").value.trim(),
+      secret: document.getElementById("fSecret").value.trim()
+    });
+    if (err) { errEl.textContent = err; errEl.style.display = "block"; return; }
+    document.getElementById("fIssuer").value = "";
+    document.getElementById("fName").value = "";
+    document.getElementById("fSecret").value = "";
+    closeSheet();
+  });
+
+  /* ---------- edit account ---------- */
+  var editOverlay = document.getElementById("editOverlay");
+  function closeEditSheet() { editOverlay.classList.remove("open"); editingId = null; }
+  document.getElementById("editCancelBtn").addEventListener("click", closeEditSheet);
+  editOverlay.addEventListener("click", function (e) { if (e.target === editOverlay) closeEditSheet(); });
+  document.getElementById("editSaveBtn").addEventListener("click", function () {
+    var errEl = document.getElementById("editErr");
+    if (!editingId) { closeEditSheet(); return; }
+    var acct = accounts.find(function (a) { return a.id === editingId; });
+    if (!acct) { closeEditSheet(); return; }
+    var issuer = document.getElementById("editIssuer").value.trim();
+    var name = document.getElementById("editName").value.trim();
+    if (!issuer && !name) { errEl.textContent = "Enter a service or an account name."; errEl.style.display = "block"; return; }
+    acct.issuer = issuer || "Account";
+    acct.name = name;
+    save(accounts);
+    closeEditSheet();
+    render();
+  });
+
+  /* ---------- gallery upload ---------- */
+  document.getElementById("uploadBtn").addEventListener("click", function () {
+    document.getElementById("galleryFile").click();
+  });
+  document.getElementById("galleryFile").addEventListener("change", function (e) {
+    var file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    var msgEl = document.getElementById("scanMsg");
+    var errEl = document.getElementById("scanErr");
+    errEl.style.display = "none";
+    if (typeof jsQR === "undefined") {
+      errEl.textContent = "QR library didn't load (needs internet once) — enter the key by hand instead.";
+      errEl.style.display = "block"; return;
+    }
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var maxSide = 1200;
+        var scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+        var canvas = document.getElementById("canvas");
+        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        var data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        var res = jsQR(data.data, data.width, data.height, { inversionAttempts: "attemptBoth" });
+        if (!res || !res.data) {
+          msgEl.textContent = "No QR code found in that image — try a clearer photo.";
+          return;
+        }
+        var parsed = parseOtpAuth(res.data);
+        if (!parsed) {
+          msgEl.textContent = "That QR code isn't a 2FA setup code — try another.";
+          return;
+        }
+        var err = addAccount(parsed);
+        if (err) msgEl.textContent = err;
+        else closeSheet();
+      };
+      img.onerror = function () { msgEl.textContent = "Couldn't read that image — try another file."; };
+      img.src = reader.result;
+    };
+    reader.onerror = function () { msgEl.textContent = "Couldn't read that image — try another file."; };
+    reader.readAsDataURL(file);
+  });
+
+  /* ---------- list actions ---------- */
+  listEl.addEventListener("click", function (e) {
+    var kebabBtn = e.target.closest("[data-kebab]");
+    if (kebabBtn) {
+      e.stopPropagation();
+      var kid = kebabBtn.getAttribute("data-kebab");
+      openMenuId = (openMenuId === kid) ? null : kid;
+      render();
+      return;
+    }
+    var editBtn = e.target.closest("[data-edit]");
+    if (editBtn) {
+      e.stopPropagation();
+      openMenuId = null;
+      var eid = editBtn.getAttribute("data-edit");
+      var eacct = accounts.find(function (a) { return a.id === eid; });
+      if (!eacct) return;
+      editingId = eid;
+      document.getElementById("editIssuer").value = eacct.issuer || "";
+      document.getElementById("editName").value = eacct.name || "";
+      document.getElementById("editErr").style.display = "none";
+      document.getElementById("editOverlay").classList.add("open");
+      render();
+      return;
+    }
+    var delBtn = e.target.closest("[data-del]");
+    if (delBtn) {
+      e.stopPropagation();
+      var id = delBtn.getAttribute("data-del");
+      var acct = accounts.find(function (a) { return a.id === id; });
+      if (acct && confirm("Delete " + (acct.issuer || "this account") + (acct.name ? " (" + acct.name + ")" : "") + "?")) {
+        accounts = accounts.filter(function (a) { return a.id !== id; });
+        openMenuId = null;
+        save(accounts); render();
+      }
+      return;
+    }
+    if (e.target.closest(".kebab-menu")) return;
+    var card = e.target.closest(".card");
+    if (!card) return;
+    var id2 = card.getAttribute("data-id");
+    var code = (codes[id2] || "").replace(/\s/g, "");
+    if (!code) return;
+    var done = function () { copiedId = id2; copiedAt = Date.now(); render(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(done).catch(function () { fallbackCopy(code); done(); });
+    } else { fallbackCopy(code); done(); }
+  });
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest(".kebab-menu") && !e.target.closest("[data-kebab]")) {
+      if (openMenuId !== null) { openMenuId = null; render(); }
+    }
+  });
+  function fallbackCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  searchEl.addEventListener("input", render);
+
+  /* ---------- backup menu ---------- */
+  var menuBtn = document.getElementById("menuBtn"), menu = document.getElementById("menu");
+  menuBtn.addEventListener("click", function (e) { e.stopPropagation(); menu.classList.toggle("open"); });
+  document.addEventListener("click", function (e) { if (!menu.contains(e.target)) menu.classList.remove("open"); });
+  document.getElementById("exportBtn").addEventListener("click", function () {
+    closeMenu();
+    var blob = vaultBlob();
+    if (!blob || !blob.data) { alert("Nothing to export yet."); return; }
+    var file = new Blob([JSON.stringify({ type: "authr-beta-vault", vault: blob }, null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(file);
+    a.download = "authr-beta-backup.json";
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+  document.getElementById("importBtn").addEventListener("click", function () {
+    menu.classList.remove("open");
+    document.getElementById("importFile").click();
+  });
+  document.getElementById("importFile").addEventListener("change", function (e) {
+    var file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var parsed = JSON.parse(reader.result);
+        var vb = parsed && parsed.vault ? parsed.vault : parsed;
+        if (!vb || !vb.salt || !vb.data) { alert("Not a valid Authr Beta backup."); return; }
+        if (!vaultUnlocked) { alert("Unlock the vault first, then import. The backup uses the same passcode."); return; }
+        // Replace the stored vault blob, then re-unlock with the current key is not possible
+        // (different salt). So: ask for the backup passcode and decrypt it, then re-encrypt.
+        var bp = prompt("Enter the passcode for this backup:");
+        if (!bp) return;
+        deriveKey(bp, b64decode(vb.salt)).then(function (bkey) {
+          return crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(b64decode(vb.iv)) }, bkey, b64decode(vb.data));
+        }).then(function (pt) {
+          var imported = JSON.parse(new TextDecoder().decode(pt));
+          if (!Array.isArray(imported)) throw new Error("bad backup");
+          accounts = imported;
+          return encryptAndStore();
+        }).then(function () { render(); refreshCodes(); alert("Backup restored."); })
+        .catch(function () { alert("Could not decrypt this backup. Wrong passcode?"); });
+      } catch (err) { alert("Could not read this backup file."); }
+    };
+    reader.readAsText(file);
+  });
+
+  /* ---------- app lock (opt-in, off by default) ---------- */
+  function loadLock() {
+    try { var v = JSON.parse(localStorage.getItem(LOCK_KEY) || "null"); return (v && v.on) ? v : null; } catch (e) { return null; }
+  }
+  function saveLock(cfg) { localStorage.setItem(LOCK_KEY, JSON.stringify(cfg)); }
+  function clearLock() { localStorage.removeItem(LOCK_KEY); }
+  var webauthnPlatform = false;
+  if (window.PublicKeyCredential && typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === "function") {
+    PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function (ok) {
+      webauthnPlatform = !!ok; refreshLockUI();
+    }).catch(function () {});
+  }
+  function bufToB64url(buf) {
+    var b = new Uint8Array(buf), s = "";
+    for (var i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function b64urlToBuf(s) {
+    s = s.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    var bin = atob(s), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out.buffer;
+  }
+  function sha256hex(str) {
+    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)).then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+    });
+  }
+  /* Download a text file. In the Android app the native bridge saves it to
+     the Downloads folder; on the web it uses a Blob download. */
+  function downloadTextFile(name, text, mime) {
+    if (window.AuthrNative && typeof window.AuthrNative.saveFile === "function") {
+      try {
+        var bytes = new TextEncoder().encode(text), bin = "";
+        for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        var ok = window.AuthrNative.saveFile(name, btoa(bin));
+        if (ok === false) alert("Couldn't save the file — storage access is needed. Allow it in the app settings.");
+        return;
+      } catch (e) {}
+    }
+    var blob = new Blob([text], { type: mime || "text/plain" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+  function refreshLockUI() {
+    // Beta: the menu button always locks the vault.
+    document.getElementById("lockBtn").textContent = "Lock vault";
+    var status = document.getElementById("lockStatus");
+    if (!on) status.textContent = "App lock is off. Turn it on to hide your codes behind fingerprint or a passcode.";
+    else {
+      var methods = [];
+      if (lockCfg.credId) methods.push("fingerprint");
+      if (lockCfg.passHash) methods.push("passcode");
+      status.textContent = "App lock is on (" + methods.join(" + ") + ").";
+    }
+    document.getElementById("fpSetupBtn").style.display = (webauthnPlatform && !(lockCfg && lockCfg.credId)) ? "block" : "none";
+    document.getElementById("lockOffBtn").style.display = on ? "block" : "none";
+    document.getElementById("lockErr").style.display = "none";
+  }
+  function unlock() {
+    locked = false;
+    document.getElementById("lockScreen").classList.remove("open");
+    refreshCodes();
+  }
+  /* Verify a fingerprint without unlocking: WebAuthn on the web, the native
+     AuthrNative bridge in the Android app. Returns Promise<boolean>. */
+  function verifyFingerprint(title) {
+    if (typeof nativeAuthenticate === "function" && lockCfg && lockCfg.nativeFp) return nativeAuthenticate(title);
+    if (!lockCfg || !lockCfg.credId) return Promise.resolve(false);
+    return navigator.credentials.get({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        allowCredentials: [{ id: b64urlToBuf(lockCfg.credId), type: "public-key" }],
+        userVerification: "required",
+        timeout: 60000
+      }
+    }).then(function () { return true; }).catch(function () { return false; });
+  }
+  function tryFingerprintUnlock(auto) {
+    if (!lockCfg || !lockCfg.credId) return Promise.resolve(false);
+    var errEl = document.getElementById("unlockErr");
+    return navigator.credentials.get({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        allowCredentials: [{ id: b64urlToBuf(lockCfg.credId), type: "public-key" }],
+        userVerification: "required",
+        timeout: 60000
+      }
+    }).then(function () { unlock(); return true; }).catch(function () {
+      if (!auto) { errEl.textContent = "Fingerprint didn't work — try again or use your passcode."; errEl.style.display = "block"; }
+      return false;
+    });
+  }
+  function showLockScreen() {
+    var hasFp = !!(lockCfg && lockCfg.credId);
+    var hasPass = !!(lockCfg && lockCfg.passHash);
+    if (!hasFp && !hasPass) { clearLock(); lockCfg = null; locked = false; return; }
+    document.getElementById("unlockErr").style.display = "none";
+    document.getElementById("fUnlockPass").value = "";
+    document.getElementById("fpUnlockBtn").style.display = hasFp ? "block" : "none";
+    document.getElementById("passUnlock").style.display = hasPass ? "block" : "none";
+    var hasDeviceUnlock = !!(window.AuthrNative && typeof window.AuthrNative.requestDeviceUnlock === "function");
+    document.getElementById("deviceUnlockLink").style.display = (hasPass && hasDeviceUnlock) ? "block" : "none";
+    document.getElementById("lockScreen").classList.add("open");
+    if (hasFp) tryFingerprintUnlock(true);
+  }
+  document.getElementById("aboutBtn").addEventListener("click", function () {
+    menu.classList.remove("open");
+    document.getElementById("aboutOverlay").classList.add("open");
+  });
+  document.getElementById("aboutCloseBtn").addEventListener("click", function () {
+    document.getElementById("aboutOverlay").classList.remove("open");
+  });
+  document.getElementById("aboutOverlay").addEventListener("click", function (e) {
+    if (e.target === this) this.classList.remove("open");
+  });
+  document.getElementById("lockBtn").addEventListener("click", function () {
+    menu.classList.remove("open");
+    if (vaultUnlocked) lockVault();
+  });
+  document.getElementById("lockCancelBtn").addEventListener("click", function () {
+    document.getElementById("lockOverlay").classList.remove("open");
+  });
+  document.getElementById("lockOverlay").addEventListener("click", function (e) {
+    if (e.target === this) this.classList.remove("open");
+  });
+  document.getElementById("fpSetupBtn").addEventListener("click", function () {
+    var errEl = document.getElementById("lockErr");
+    errEl.style.display = "none";
+    navigator.credentials.create({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp: { name: "Authr" },
+        user: { id: crypto.getRandomValues(new Uint8Array(16)), name: "authr-user", displayName: "Authr user" },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "preferred" },
+        timeout: 60000,
+        attestation: "none"
+      }
+    }).then(function (cred) {
+      var cfg = loadLock() || { on: true };
+      cfg.on = true; cfg.credId = bufToB64url(cred.rawId);
+      saveLock(cfg); lockCfg = cfg;
+      refreshLockUI();
+      alert("Fingerprint set — Authr will ask for it when it opens.");
+    }).catch(function () {
+      errEl.textContent = "Fingerprint setup was cancelled or isn't available on this device — set a passcode below instead.";
+      errEl.style.display = "block";
+    });
+  });
+  document.getElementById("passSetupBtn").addEventListener("click", function () {
+    var p1 = document.getElementById("fPass").value;
+    var p2 = document.getElementById("fPass2").value;
+    var errEl = document.getElementById("lockErr");
+    if (!/^\d{4,}$/.test(p1)) { errEl.textContent = "Passcode must be at least 4 digits."; errEl.style.display = "block"; return; }
+    if (p1 !== p2) { errEl.textContent = "Passcodes don't match — try again."; errEl.style.display = "block"; return; }
+    sha256hex(p1).then(function (h) {
+      var cfg = loadLock() || { on: true };
+      cfg.on = true; cfg.passHash = h;
+      saveLock(cfg); lockCfg = cfg;
+      document.getElementById("fPass").value = "";
+      document.getElementById("fPass2").value = "";
+      refreshLockUI();
+      if (recoveryMode) endRecovery();
+      alert("Passcode set — Authr will ask for it when it opens.");
+    });
+  });
+  var recoveryMode = false;
+  function endRecovery() {
+    recoveryMode = false;
+    document.getElementById("recoveryBanner").style.display = "none";
+    document.getElementById("lockCancelBtn").style.display = "block";
+  }
+  function turnLockOff() {
+    clearLock(); lockCfg = null;
+    endRecovery();
+    document.getElementById("lockOverlay").classList.remove("open");
+    refreshLockUI();
+  }
+  document.getElementById("lockOffBtn").addEventListener("click", function () {
+    var errEl = document.getElementById("lockErr");
+    errEl.style.display = "none";
+    if (lockCfg && (lockCfg.credId || lockCfg.nativeFp)) {
+      verifyFingerprint("Turn off App lock").then(function (ok) {
+        if (!ok) { errEl.textContent = "Fingerprint didn't work — the lock stays on."; errEl.style.display = "block"; return; }
+        turnLockOff();
+      });
+      return;
+    }
+    if (!confirm("Turn off App lock? Your codes will open without unlocking.")) return;
+    turnLockOff();
+  });
+  document.getElementById("fpUnlockBtn").addEventListener("click", function () { tryFingerprintUnlock(false); });
+  document.getElementById("passUnlockBtn").addEventListener("click", function () {
+    var v = document.getElementById("fUnlockPass").value;
+    var errEl = document.getElementById("unlockErr");
+    sha256hex(v).then(function (h) {
+      if (lockCfg && h === lockCfg.passHash) unlock();
+      else { errEl.textContent = "Wrong passcode — try again."; errEl.style.display = "block"; }
+    });
+  });
+  document.getElementById("fUnlockPass").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") document.getElementById("passUnlockBtn").click();
+  });
+  /* Device unlock (Android app only): the phone's own lock screen —
+     fingerprint, PIN or pattern — recovers a forgotten passcode, even
+     when the app itself has no fingerprint enrolled. */
+  document.getElementById("deviceUnlockLink").addEventListener("click", function () {
+    var errEl = document.getElementById("unlockErr");
+    errEl.style.display = "none";
+    if (window.AuthrNative && typeof window.AuthrNative.requestDeviceUnlock === "function") {
+      try { window.AuthrNative.requestDeviceUnlock(); } catch (e) {
+        errEl.textContent = "Device unlock isn't available — use your passcode.";
+        errEl.style.display = "block";
+      }
+    }
+  });
+  window.__onDeviceUnlockResult = function (ok) {
+    if (ok) {
+      recoveryMode = true;
+      unlock();
+      document.getElementById("recoveryBanner").style.display = "block";
+      document.getElementById("lockCancelBtn").style.display = "none";
+      refreshLockUI();
+      document.getElementById("lockOverlay").classList.add("open");
+    } else {
+      var errEl = document.getElementById("unlockErr");
+      errEl.textContent = "Device unlock didn't work — try again or use your passcode.";
+      errEl.style.display = "block";
+    }
+  };
+
+  /* ---------- vault startup ---------- */
+  var vaultScreenEl = document.getElementById("vaultScreen");
+  function showVaultScreen() {
+    var hasVault = !!vaultBlob();
+    document.getElementById("vaultTitle").textContent = "Authr Beta";
+    document.getElementById("vaultHint").textContent = hasVault
+      ? "Enter your passcode to unlock the vault."
+      : "Set a passcode to create your encrypted vault.";
+    document.getElementById("vaultSetup").style.display = hasVault ? "none" : "block";
+    document.getElementById("vaultUnlock").style.display = hasVault ? "block" : "none";
+    document.getElementById("vaultSetupErr").style.display = "none";
+    document.getElementById("vaultUnlockErr").style.display = "none";
+    vaultScreenEl.classList.add("open");
+    document.getElementById("list").style.display = "none";
+    document.getElementById("empty").style.display = "none";
+  }
+  function hideVaultScreen() {
+    vaultScreenEl.classList.remove("open");
+    document.getElementById("list").style.display = "";
+    render();
+    refreshCodes();
+  }
+  document.getElementById("vaultCreateBtn").addEventListener("click", function () {
+    var errEl = document.getElementById("vaultSetupErr");
+    var p1 = document.getElementById("fVaultPass1").value;
+    var p2 = document.getElementById("fVaultPass2").value;
+    if (!p1 || p1.length < 4) { errEl.textContent = "Passcode must be at least 4 digits."; errEl.style.display = "block"; return; }
+    if (p1 !== p2) { errEl.textContent = "Passcodes do not match."; errEl.style.display = "block"; return; }
+    var btn = document.getElementById("vaultCreateBtn");
+    btn.textContent = "Creating vault..."; btn.disabled = true;
+    createVault(p1).then(function () {
+      clearFails();
+      vaultUnlocked = true;
+      document.getElementById("fVaultPass1").value = "";
+      document.getElementById("fVaultPass2").value = "";
+      btn.textContent = "Create vault"; btn.disabled = false;
+      hideVaultScreen();
+      armAutoLock();
+    }).catch(function () {
+      errEl.textContent = "Could not create the vault. Try again."; errEl.style.display = "block";
+      btn.textContent = "Create vault"; btn.disabled = false;
+    });
+  });
+  document.getElementById("vaultUnlockBtn").addEventListener("click", function () {
+    var errEl = document.getElementById("vaultUnlockErr");
+    var now = Date.now();
+    if (failState.lockoutUntil > now) {
+      var secs = Math.ceil((failState.lockoutUntil - now) / 1000);
+      errEl.textContent = "Too many wrong attempts. Try again in " + secs + "s.";
+      errEl.style.display = "block"; return;
+    }
+    var p = document.getElementById("fVaultPass").value;
+    if (!p) { errEl.textContent = "Enter your passcode."; errEl.style.display = "block"; return; }
+    var btn = document.getElementById("vaultUnlockBtn");
+    btn.textContent = "Unlocking..."; btn.disabled = true;
+    unlockVault(p).then(function (ok) {
+      btn.textContent = "Unlock vault"; btn.disabled = false;
+      if (!ok) {
+        noteFail();
+        document.getElementById("fVaultPass").value = "";
+        errEl.textContent = failState.count >= 5 ? "Wrong passcode. Too many attempts — locked out briefly." : "Wrong passcode.";
+        errEl.style.display = "block";
+        return;
+      }
+      clearFails();
+      vaultUnlocked = true;
+      document.getElementById("fVaultPass").value = "";
+      hideVaultScreen();
+      armAutoLock();
+    });
+  });
+  // Auto-lock: when the page is hidden, or after 60s idle.
+  var idleTimer = null;
+  function armAutoLock() {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(function () { if (vaultUnlocked) lockVault(); }, 60000);
+  }
+  ["click", "keydown", "touchstart"].forEach(function (ev) {
+    document.addEventListener(ev, function () { if (vaultUnlocked) armAutoLock(); }, { passive: true });
+  });
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden && vaultUnlocked) lockVault();
+  });
+  // Lock button in the menu locks the vault.
+  var _lockBtn = document.getElementById("lockBtn");
+  if (_lockBtn) { _lockBtn.textContent = "Lock vault"; }
+
+  /* ---------- tick ---------- */
+  showVaultScreen();
+  setInterval(function () {
+    var now = Date.now();
+    var remain = 30 - (Math.floor(now / 1000) % 30);
+    if (remain === 30) refreshCodes(); else render();
+  }, 1000);
+
+  // Beta: no service worker (online test build).
+})();
+</script>
+</body>
+</html>
